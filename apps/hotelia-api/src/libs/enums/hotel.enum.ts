@@ -27,3 +27,10 @@ export enum HotelAmenity {
 	RESTAURANT = 'RESTAURANT',
 }
 registerEnumType(HotelAmenity, { name: 'HotelAmenity' });
+
+export enum HotelSort {
+  NEWEST = 'NEWEST',
+  RATING = 'RATING',
+  MOST_POPULAR = 'MOST_POPULAR',
+}
+registerEnumType(HotelSort, { name: 'HotelSort' });
