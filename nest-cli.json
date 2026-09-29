@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json.schemastore.org/nest-cli",
+  "collection": "@nestjs/schematics",
+  "sourceRoot": "apps/hotelia-api/src",
+  "compilerOptions": {
+    "deleteOutDir": true,
+    "webpack": true,
+    "tsConfigPath": "apps/hotelia-api/tsconfig.app.json"
+  },
+  "monorepo": true,
+  "root": "apps/hotelia-api",
+  "projects": {
+    "hotelia-api": {
+      "type": "application",
+      "root": "apps/hotelia-api",
+      "entryFile": "main",
+      "sourceRoot": "apps/hotelia-api/src",
+      "compilerOptions": {
+        "tsConfigPath": "apps/hotelia-api/tsconfig.app.json"
+      }
+    },
+    "hotelia-batch": {
+      "type": "application",
+      "root": "apps/hotelia-batch",
+      "entryFile": "main",
+      "sourceRoot": "apps/hotelia-batch/src",
+      "compilerOptions": {
+        "tsConfigPath": "apps/hotelia-batch/tsconfig.app.json"
+      }
+    }
+  }
+}
