@@ -1,0 +1,73 @@
+import { Field, Float, Int, ObjectType } from '@nestjs/graphql';
+import type { ObjectId } from "mongoose";
+import { HotelAmenity, HotelStatus, HotelType } from '../../enums/hotel.enum';
+import { TotalCounter } from '../member/member';
+
+@ObjectType()
+export class Hotel {
+  @Field(() => String)
+  _id!: ObjectId;
+
+  @Field(() => String)
+  ownerId!: ObjectId;
+
+  @Field(() => String)
+  hotelName!: string;
+
+  @Field(() => String)
+  hotelDescription!: string;
+
+  @Field(() => String)
+  hotelCountry!: string;
+
+  @Field(() => String)
+  hotelCity!: string;
+
+  @Field(() => String)
+  hotelAddress!: string;
+
+  @Field(() => String)
+  hotelTimezone!: string;
+
+  @Field(() => HotelType)
+  hotelType!: HotelType;
+
+  @Field(() => HotelStatus)
+  hotelStatus!: HotelStatus;
+
+  @Field(() => [String])
+  hotelImages!: string[];
+
+  @Field(() => [HotelAmenity])
+  hotelAmenities!: HotelAmenity[];
+
+  @Field(() => Float)
+  hotelRating!: number;
+
+  @Field(() => Int)
+  hotelReviews!: number;
+
+  @Field(() => Int)
+  hotelViews!: number;
+
+  @Field(() => Int)
+  hotelLikes!: number;
+
+  @Field(() => Date)
+  createdAt!: Date;
+
+  @Field(() => Date)
+  updatedAt!: Date;
+
+  @Field(() => Date, { nullable: true })
+  deletedAt?: Date;
+}
+
+@ObjectType()
+export class Hotels {
+  @Field(() => [Hotel])
+  list!: Hotel[];
+
+  @Field(() => [TotalCounter])
+  metaCounter!: TotalCounter[];
+}
