@@ -1,73 +1,77 @@
 import { Field, Float, Int, ObjectType } from '@nestjs/graphql';
 import type { Types } from 'mongoose';
 import { HotelAmenity, HotelStatus, HotelType } from '../../enums/hotel.enum';
+import { MemberPublic } from '../member/member-public';
 import { TotalCounter } from '../member/member';
 
 @ObjectType()
 export class Hotel {
-  @Field(() => String)
-  _id!: Types.ObjectId;
+	@Field(() => MemberPublic, { nullable: true })
+	memberData?: MemberPublic | null;
 
-  @Field(() => String)
-  ownerId!: Types.ObjectId;
+	@Field(() => String)
+	_id!: Types.ObjectId;
 
-  @Field(() => String)
-  hotelName!: string;
+	@Field(() => String)
+	ownerId!: Types.ObjectId;
 
-  @Field(() => String)
-  hotelDescription!: string;
+	@Field(() => String)
+	hotelName!: string;
 
-  @Field(() => String)
-  hotelCountry!: string;
+	@Field(() => String)
+	hotelDescription!: string;
 
-  @Field(() => String)
-  hotelCity!: string;
+	@Field(() => String)
+	hotelCountry!: string;
 
-  @Field(() => String)
-  hotelAddress!: string;
+	@Field(() => String)
+	hotelCity!: string;
 
-  @Field(() => String)
-  hotelTimezone!: string;
+	@Field(() => String)
+	hotelAddress!: string;
 
-  @Field(() => HotelType)
-  hotelType!: HotelType;
+	@Field(() => String)
+	hotelTimezone!: string;
 
-  @Field(() => HotelStatus)
-  hotelStatus!: HotelStatus;
+	@Field(() => HotelType)
+	hotelType!: HotelType;
 
-  @Field(() => [String])
-  hotelImages!: string[];
+	@Field(() => HotelStatus)
+	hotelStatus!: HotelStatus;
 
-  @Field(() => [HotelAmenity])
-  hotelAmenities!: HotelAmenity[];
+	@Field(() => [String])
+	hotelImages!: string[];
 
-  @Field(() => Float)
-  hotelRating!: number;
+	@Field(() => [HotelAmenity])
+	hotelAmenities!: HotelAmenity[];
 
-  @Field(() => Int)
-  hotelReviews!: number;
+	@Field(() => Float)
+	hotelRating!: number;
 
-  @Field(() => Int)
-  hotelViews!: number;
+	@Field(() => Int)
+	hotelReviews!: number;
 
-  @Field(() => Int)
-  hotelLikes!: number;
+	@Field(() => Int)
+	hotelViews!: number;
 
-  @Field(() => Date)
-  createdAt!: Date;
+	@Field(() => Int)
+	hotelLikes!: number;
 
-  @Field(() => Date)
-  updatedAt!: Date;
+	@Field(() => Date)
+	createdAt!: Date;
 
-  @Field(() => Date, { nullable: true })
-  deletedAt?: Date;
+	@Field(() => Date)
+	updatedAt!: Date;
+
+	@Field(() => Date, { nullable: true })
+	deletedAt?: Date;
 }
 
 @ObjectType()
 export class Hotels {
-  @Field(() => [Hotel])
-  list!: Hotel[];
+	@Field(() => [Hotel])
+	list!: Hotel[];
 
-  @Field(() => [TotalCounter])
-  metaCounter!: TotalCounter[];
+	@Field(() => [TotalCounter])
+	metaCounter!: TotalCounter[];
 }

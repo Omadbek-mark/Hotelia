@@ -8,8 +8,17 @@ import { HotelResolver } from './hotel.resolver';
 import { HotelService } from './hotel.service';
 
 @Module({
-  imports: [MongooseModule.forFeature([{ name: 'Hotel', schema: HotelSchema }]), AuthModule, MemberModule, ViewModule],
-  providers: [HotelResolver, HotelService],
-  exports: [HotelService],
+	imports: [MongooseModule.forFeature([
+		{
+			name: 'Hotel',
+			schema: HotelSchema
+		}
+	]),
+		AuthModule,
+		MemberModule,
+		ViewModule
+	],
+	providers: [HotelResolver, HotelService],
+	exports: [HotelService],
 })
 export class HotelModule {}
