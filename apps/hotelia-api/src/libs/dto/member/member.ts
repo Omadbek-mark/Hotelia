@@ -43,6 +43,9 @@ export class Member {
   @Field(() => String, {nullable: true})
   memberDesc?: string;
 
+  @Field(() => Int, { defaultValue: 0 })
+  memberHotels: number = 0;
+
   @Field(() => Int)
   memberProperties!: number;
 
@@ -87,6 +90,11 @@ export class Member {
 
   @Field(() => String, { nullable: true })
   accessToken?: string;
+  @Field(() => String, { nullable: true })
+  refreshToken?: string;
+
+  // Request-only identity; never exposed in GraphQL or stored in Member.
+  authSessionId?: string;
   toObject: any;
 
   /** from aggregation */

@@ -1,3 +1,4 @@
+import type { Types } from 'mongoose';
 import { Field, InputType } from '@nestjs/graphql';
 import { Transform } from 'class-transformer';
 import { ArrayMaxSize, ArrayMinSize, ArrayUnique, IsArray, IsEnum, IsIn, IsMongoId, IsString, IsTimeZone, Length, ValidateIf } from 'class-validator';
@@ -5,6 +6,9 @@ import { HotelAmenity, HotelStatus, HotelType } from '../../enums/hotel.enum';
 
 @InputType()
 export class HotelInput {
+  // Set by the resolver from the authenticated member, never exposed in GraphQL.
+  declare ownerId?: Types.ObjectId;
+
   @Transform(({ value }) => typeof value === 'string' ? value.trim() : value)
   @IsString()
   @Length(3, 100)
