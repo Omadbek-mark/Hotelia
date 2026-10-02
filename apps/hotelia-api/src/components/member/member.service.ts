@@ -1,7 +1,8 @@
+import { MemberPublic } from '../../libs/dto/member/member-public';
 import { escapeSearchText } from '../../libs/search';
 import { BadRequestException, ConflictException, ForbiddenException, Injectable, InternalServerErrorException, UnauthorizedException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { ClientSession, Model, ObjectId } from 'mongoose';
+import { ClientSession, Model, ObjectId, Types } from 'mongoose';
 import { Member, Members } from '../../libs/dto/member/member';
 import { HotelOwnersInquiry, LoginInput, MemberInput, MembersInquiry } from '../../libs/dto/member/member.input';
 import { MemberAuthType, MemberStatus, MemberType } from '../../libs/enums/member.enum';
@@ -112,6 +113,22 @@ export class MemberService {
     if (!result) throw new InternalServerErrorException(Message.UPDATE_FAILED);
 
     return result;
+  }
+
+  public async getHotelOwner(ownerId: Types.ObjectId): Promise<MemberPublic | null> {
+    const owner = await this.memberModel.findOne({
+      _id: ownerId,
+      memberStatus: MemberStatus.ACTIVE,
+      memberType: MemberType.HOTEL_OWNER,
+    }).select('_id memberNick memberImage memberDesc').lean().exec();
+
+    if (!owner) return null;
+    return {
+      _id: new Types.ObjectId(owner._id.toString()),
+      memberNick: owner.memberNick,
+      memberImage: owner.memberImage,
+      memberDesc: owner.memberDesc,
+    };
   }
 
   public async getMember(memberId: ObjectId, targetId: ObjectId): Promise<Member> {
