@@ -64,6 +64,71 @@ describe('getHotel GraphQL', () => {
 			variableValues: { input },
 			contextValue: { req: { headers: {} } },
 		});
+	const update = (input: unknown, signedIn = true) =>
+		graphql({
+			schema: app.get(GraphQLSchemaHost).schema,
+			source: 'mutation($input:HotelUpdate!){updateHotel(input:$input){_id hotelName hotelStatus}}',
+			variableValues: { input },
+			contextValue: { req: { headers: signedIn ? { authorization: 'Bearer valid' } : {} } },
+		});
+	it.each(['USER', 'ADMIN', 'GUEST'])('denies hotel updates from %s', async (role) => {
+		auth.verifyToken.mockResolvedValue({ _id: new Types.ObjectId(), memberType: role });
+		expect((await update({ _id: String(id), hotelName: 'Changed Hotel' }, role !== 'GUEST')).errors).toBeDefined();
+		expect(storage.findOneAndUpdate).not.toHaveBeenCalled();
+	});
+	it.each([
+		{ _id: 'invalid', hotelName: 'Changed Hotel' },
+		{ _id: String(id) },
+		{ _id: String(id), hotelName: null },
+		{ _id: String(id), hotelStatus: 'DELETE' },
+		{ _id: String(id), hotelImages: [] },
+		{ _id: String(id), ownerId: String(id) },
+		{ _id: String(id), hotelViews: 100 },
+	])('rejects invalid hotel updates %j', async (input) => {
+		auth.verifyToken.mockResolvedValue({ _id: new Types.ObjectId(), memberType: 'HOTEL_OWNER' });
+		expect((await update(input)).errors).toBeDefined();
+		expect(storage.findOneAndUpdate).not.toHaveBeenCalled();
+	});
+	it.each(['ACTIVE', 'PAUSED'])('updates an owned hotel to %s with an atomic owner filter', async (status) => {
+		const ownerId = new Types.ObjectId();
+		auth.verifyToken.mockResolvedValue({ _id: ownerId, memberType: 'HOTEL_OWNER' });
+		storage.findOneAndUpdate.mockReturnValue({
+			exec: async () => ({ _id: id, hotelName: 'Changed Hotel', hotelStatus: status }),
+		});
+		const result = await update({
+			_id: String(id),
+			hotelName: '  Changed Hotel  ',
+			hotelStatus: status,
+			hotelAmenities: [],
+		});
+		expect(result.errors).toBeUndefined();
+		expect(storage.findOneAndUpdate).toHaveBeenCalledWith(
+			{
+				_id: id,
+				ownerId,
+				hotelStatus: { $in: ['ACTIVE', 'PAUSED'] },
+			},
+			{ $set: { hotelName: 'Changed Hotel', hotelStatus: status, hotelAmenities: [] } },
+			{ new: true, runValidators: true },
+		);
+		expect(connection.transaction).not.toHaveBeenCalled();
+	});
+	it('returns not-found when the ownership/status filter does not match', async () => {
+		auth.verifyToken.mockResolvedValue({ _id: new Types.ObjectId(), memberType: 'HOTEL_OWNER' });
+		storage.findOneAndUpdate.mockReturnValue({ exec: async () => null });
+		const result = await update({ _id: String(id), hotelName: 'Changed Hotel' });
+		expect((result.errors?.[0].originalError as any).getStatus()).toBe(404);
+	});
+	it('does not disguise an update database failure', async () => {
+		auth.verifyToken.mockResolvedValue({ _id: new Types.ObjectId(), memberType: 'HOTEL_OWNER' });
+		const failure = new Error('Database unavailable');
+		storage.findOneAndUpdate.mockReturnValue({
+			exec: async () => {
+				throw failure;
+			},
+		});
+		expect((await update({ _id: String(id), hotelName: 'Changed Hotel' })).errors?.[0].originalError).toBe(failure);
+	});
 	it('accepts a guest search with default pagination and returns an empty list', async () => {
 		storage.aggregate.mockReturnValue({ exec: async () => [{ list: [], metaCounter: [] }] });
 		const result = await runList({});
