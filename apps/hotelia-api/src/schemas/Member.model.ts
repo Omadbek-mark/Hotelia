@@ -64,6 +64,14 @@ const MemberSchema = new Schema(
       type: String,
     },
 
+    memberHotels: {
+      type: Number,
+      default: 0,
+      min: 0,
+      validate: Number.isInteger,
+    },
+
+    // Legacy Property module counter; separate from Hotel inventory.
     memberProperties: {
       type: Number,
       default: 0,

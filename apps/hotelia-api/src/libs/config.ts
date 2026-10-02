@@ -1,6 +1,7 @@
+import { BadRequestException } from '@nestjs/common';
 import { ObjectId } from "bson";
 
-export const availableAgentSorts = ['createdAt', 'updatedAt', 'memberLikes', 'memberViews', 'memberRank'];
+export const availableHotelOwnerSorts = ['createdAt', 'updatedAt', 'memberLikes', 'memberViews', 'memberRank'];
 export const availableMemberSorts = ['createdAt', 'updatedAt', 'memberLikes', 'memberViews'];
 
 export const availableOptions = ['propertyBarter', 'propertyRent'];
@@ -30,7 +31,11 @@ export const getSerialForImage = (filename: string) => {
 };
 
 export const shapeIntoMongoObjectId = (target: any) => {
-  return typeof target === 'string' ? new Types.ObjectId(target) : target;
+  if (typeof target === 'string') {
+    if (!/^[a-fA-F0-9]{24}$/.test(target)) throw new BadRequestException('Invalid ObjectId');
+    return new Types.ObjectId(target);
+  }
+  return target;
 };
 
 export const lookupAuthMemberLiked = (memberId: T, targetRefId: string = '$_id') => {

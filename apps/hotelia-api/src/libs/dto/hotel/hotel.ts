@@ -1,15 +1,15 @@
 import { Field, Float, Int, ObjectType } from '@nestjs/graphql';
-import type { ObjectId } from "mongoose";
+import type { Types } from 'mongoose';
 import { HotelAmenity, HotelStatus, HotelType } from '../../enums/hotel.enum';
 import { TotalCounter } from '../member/member';
 
 @ObjectType()
 export class Hotel {
   @Field(() => String)
-  _id!: ObjectId;
+  _id!: Types.ObjectId;
 
   @Field(() => String)
-  ownerId!: ObjectId;
+  ownerId!: Types.ObjectId;
 
   @Field(() => String)
   hotelName!: string;
