@@ -3,6 +3,7 @@ import { Args, Mutation, Query, Resolver } from '@nestjs/graphql';
 import { Hotel, Hotels } from '../../libs/dto/hotel/hotel';
 import { HotelsInquiry } from '../../libs/dto/hotel/hotel.inquiry';
 import { HotelInput } from '../../libs/dto/hotel/hotel.input';
+import { HotelUpdate } from '../../libs/dto/hotel/hotel.update';
 import { shapeIntoMongoObjectId } from '../../libs/config';
 import { Types } from 'mongoose';
 import { MemberType } from '../../libs/enums/member.enum';
@@ -26,6 +27,17 @@ export class HotelResolver {
 	): Promise<Hotel> {
 		input.ownerId = memberId;
 		return await this.hotelService.createHotel(input);
+	}
+
+	@Roles(MemberType.HOTEL_OWNER)
+	@UseGuards(RolesGuard)
+	@Mutation(() => Hotel)
+	public async updateHotel(
+		@AuthMember('_id') memberId: Types.ObjectId,
+		@Args('input', new ValidationPipe({ transform: true, whitelist: true, forbidNonWhitelisted: true }))
+		input: HotelUpdate,
+	): Promise<Hotel> {
+		return await this.hotelService.updateHotel(memberId, input);
 	}
 
 	@Query(() => Hotels)
