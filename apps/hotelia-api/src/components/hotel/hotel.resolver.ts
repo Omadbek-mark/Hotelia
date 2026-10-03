@@ -1,7 +1,7 @@
 import { UseGuards, ValidationPipe } from '@nestjs/common';
 import { Args, Mutation, Query, Resolver } from '@nestjs/graphql';
 import { Hotel, Hotels } from '../../libs/dto/hotel/hotel';
-import { HotelsInquiry } from '../../libs/dto/hotel/hotel.inquiry';
+import { HotelsInquiry, OwnerHotelsInquiry } from '../../libs/dto/hotel/hotel.inquiry';
 import { HotelInput } from '../../libs/dto/hotel/hotel.input';
 import { HotelUpdate } from '../../libs/dto/hotel/hotel.update';
 import { shapeIntoMongoObjectId } from '../../libs/config';
@@ -40,12 +40,45 @@ export class HotelResolver {
 		return await this.hotelService.updateHotel(memberId, input);
 	}
 
+	@Roles(MemberType.HOTEL_OWNER)
+	@UseGuards(RolesGuard)
+	@Mutation(() => Hotel)
+	public async deleteHotel(
+		@AuthMember('_id') memberId: Types.ObjectId,
+		@Args('hotelId') input: string,
+	): Promise<Hotel> {
+		const hotelId = shapeIntoMongoObjectId(input);
+		return await this.hotelService.deleteHotel(memberId, hotelId);
+	}
+
 	@Query(() => Hotels)
 	public async getHotels(
 		@Args('input', new ValidationPipe({ transform: true, whitelist: true, forbidNonWhitelisted: true }))
 		input: HotelsInquiry,
 	): Promise<Hotels> {
 		return await this.hotelService.getHotels(input);
+	}
+
+	@Roles(MemberType.HOTEL_OWNER)
+	@UseGuards(RolesGuard)
+	@Query(() => Hotels)
+	public async getOwnerHotels(
+		@AuthMember('_id') memberId: Types.ObjectId,
+		@Args('input', new ValidationPipe({ transform: true, whitelist: true, forbidNonWhitelisted: true }))
+		input: OwnerHotelsInquiry,
+	): Promise<Hotels> {
+		return await this.hotelService.getOwnerHotels(memberId, input);
+	}
+
+	@Roles(MemberType.HOTEL_OWNER)
+	@UseGuards(RolesGuard)
+	@Query(() => Hotel)
+	public async getOwnerHotel(
+		@AuthMember('_id') memberId: Types.ObjectId,
+		@Args('hotelId') input: string,
+	): Promise<Hotel> {
+		const hotelId = shapeIntoMongoObjectId(input);
+		return await this.hotelService.getOwnerHotel(memberId, hotelId);
 	}
 
 	@UseGuards(WithoutGuard)

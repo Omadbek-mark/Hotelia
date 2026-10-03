@@ -36,3 +36,10 @@ export enum RoomAmenity {
 	PRIVATE_BATHROOM = 'PRIVATE_BATHROOM',
 }
 registerEnumType(RoomAmenity, { name: 'RoomAmenity' });
+
+export enum RoomSort {
+	NEWEST = 'NEWEST',
+	PRICE_ASC = 'PRICE_ASC',
+	PRICE_DESC = 'PRICE_DESC',
+}
+registerEnumType(RoomSort, { name: 'RoomSort' });

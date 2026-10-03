@@ -5,6 +5,7 @@ import {
 	ArrayUnique,
 	IsArray,
 	IsEnum,
+	IsIn,
 	IsInt,
 	IsNumber,
 	IsObject,
@@ -15,7 +16,7 @@ import {
 	ValidateIf,
 	ValidateNested,
 } from 'class-validator';
-import { HotelAmenity, HotelSort, HotelType } from '../../enums/hotel.enum';
+import { HotelAmenity, HotelSort, HotelStatus, HotelType } from '../../enums/hotel.enum';
 
 @InputType()
 export class HotelSearch {
@@ -76,4 +77,12 @@ export class HotelsInquiry {
 	@Type(() => HotelSearch)
 	@Field(() => HotelSearch, { nullable: true })
 	search?: HotelSearch;
+}
+
+@InputType()
+export class OwnerHotelsInquiry extends HotelsInquiry {
+	@ValidateIf((_, value) => value !== undefined)
+	@IsIn([HotelStatus.ACTIVE, HotelStatus.PAUSED])
+	@Field(() => HotelStatus, { nullable: true })
+	hotelStatus?: HotelStatus;
 }

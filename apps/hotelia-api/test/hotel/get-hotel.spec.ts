@@ -16,7 +16,7 @@ describe('getHotel GraphQL', () => {
 	let app: INestApplication;
 	const id = new Types.ObjectId();
 	const storage = { findOne: jest.fn(), findOneAndUpdate: jest.fn(), aggregate: jest.fn() };
-	const members = { getHotelOwner: jest.fn() };
+	const members = { getHotelOwner: jest.fn(), memberStatsEditor: jest.fn() };
 	const views = { recordView: jest.fn() };
 	const session = {};
 	const connection = { transaction: jest.fn(async (callback) => callback(session)) };
@@ -41,6 +41,7 @@ describe('getHotel GraphQL', () => {
 	afterAll(async () => app?.close());
 	beforeEach(() => {
 		jest.resetAllMocks();
+		connection.transaction.mockImplementation(async (callback) => callback(session));
 		members.getHotelOwner.mockResolvedValue(null);
 		storage.findOne.mockReturnValue({
 			lean: () => ({
@@ -64,6 +65,97 @@ describe('getHotel GraphQL', () => {
 			variableValues: { input },
 			contextValue: { req: { headers: {} } },
 		});
+	const ownerDetail = (hotelId = String(id), signedIn = true) =>
+		graphql({
+			schema: app.get(GraphQLSchemaHost).schema,
+			source: 'query($id:String!){getOwnerHotel(hotelId:$id){_id hotelStatus memberData{memberNick}}}',
+			variableValues: { id: hotelId },
+			contextValue: { req: { headers: signedIn ? { authorization: 'Bearer valid' } : {} } },
+		});
+	it.each(['USER', 'ADMIN', 'GUEST'])('denies owner detail to %s', async (role) => {
+		auth.verifyToken.mockResolvedValue({ _id: new Types.ObjectId(), memberType: role });
+		expect((await ownerDetail(String(id), role !== 'GUEST')).errors).toBeDefined();
+		expect(storage.findOne).not.toHaveBeenCalled();
+	});
+	it.each(['ACTIVE', 'PAUSED'])('returns an owned %s detail without recording a view', async (status) => {
+		const ownerId = new Types.ObjectId();
+		auth.verifyToken.mockResolvedValue({ _id: ownerId, memberType: 'HOTEL_OWNER' });
+		storage.findOne.mockReturnValue({
+			lean: () => ({ exec: async () => ({ _id: id, ownerId, hotelStatus: status }) }),
+		});
+		members.getHotelOwner.mockResolvedValue({ memberNick: 'host' });
+		const result = await ownerDetail();
+		expect(result.errors).toBeUndefined();
+		expect(result.data?.getOwnerHotel).toMatchObject({ hotelStatus: status, memberData: { memberNick: 'host' } });
+		expect(storage.findOne).toHaveBeenCalledWith({ _id: id, ownerId, hotelStatus: { $in: ['ACTIVE', 'PAUSED'] } });
+		expect(views.recordView).not.toHaveBeenCalled();
+		expect(storage.findOneAndUpdate).not.toHaveBeenCalled();
+	});
+	it('rejects an invalid owner detail ID before querying the database', async () => {
+		auth.verifyToken.mockResolvedValue({ _id: new Types.ObjectId(), memberType: 'HOTEL_OWNER' });
+		expect((await ownerDetail('invalid')).errors).toBeDefined();
+		expect(storage.findOne).not.toHaveBeenCalled();
+	});
+	it('returns not-found for a detail outside the owner/status filter', async () => {
+		auth.verifyToken.mockResolvedValue({ _id: new Types.ObjectId(), memberType: 'HOTEL_OWNER' });
+		storage.findOne.mockReturnValue({ lean: () => ({ exec: async () => null }) });
+		expect(((await ownerDetail()).errors?.[0].originalError as any).getStatus()).toBe(404);
+		expect(members.getHotelOwner).not.toHaveBeenCalled();
+	});
+	it('propagates database errors from owner detail', async () => {
+		auth.verifyToken.mockResolvedValue({ _id: new Types.ObjectId(), memberType: 'HOTEL_OWNER' });
+		const error = new Error('database unavailable');
+		storage.findOne.mockReturnValue({
+			lean: () => ({
+				exec: async () => {
+					throw error;
+				},
+			}),
+		});
+		expect((await ownerDetail()).errors?.[0].originalError).toBe(error);
+	});
+	const ownerList = (input: unknown, signedIn = true) =>
+		graphql({
+			schema: app.get(GraphQLSchemaHost).schema,
+			source:
+				'query($input:OwnerHotelsInquiry!){getOwnerHotels(input:$input){list{_id hotelStatus} metaCounter{total}}}',
+			variableValues: { input },
+			contextValue: { req: { headers: signedIn ? { authorization: 'Bearer valid' } : {} } },
+		});
+	it.each(['USER', 'ADMIN', 'GUEST'])('denies owner list access to %s', async (role) => {
+		auth.verifyToken.mockResolvedValue({ _id: new Types.ObjectId(), memberType: role });
+		expect((await ownerList({}, role !== 'GUEST')).errors).toBeDefined();
+		expect(storage.aggregate).not.toHaveBeenCalled();
+	});
+	it.each([{}, { hotelStatus: 'ACTIVE' }, { hotelStatus: 'PAUSED' }])(
+		'scopes owner list and count to the authenticated owner: %j',
+		async (input) => {
+			const ownerId = new Types.ObjectId();
+			auth.verifyToken.mockResolvedValue({ _id: ownerId, memberType: 'HOTEL_OWNER' });
+			storage.aggregate.mockReturnValue({ exec: async () => [{ list: [], metaCounter: [] }] });
+			const result = await ownerList({ ...input, page: 2, limit: 5, search: { hotelType: 'RESORT' } });
+			expect(result.errors).toBeUndefined();
+			const pipeline = storage.aggregate.mock.calls[0][0];
+			expect(pipeline[0].$match).toEqual({
+				ownerId,
+				hotelStatus: input.hotelStatus ?? { $in: ['ACTIVE', 'PAUSED'] },
+				hotelType: 'RESORT',
+			});
+			expect(pipeline[2].$facet.list.slice(0, 2)).toEqual([{ $skip: 5 }, { $limit: 5 }]);
+			expect(pipeline[2].$facet.metaCounter).toEqual([{ $count: 'total' }]);
+		},
+	);
+	it.each([
+		{ hotelStatus: 'DELETE' },
+		{ hotelStatus: null },
+		{ ownerId: String(id) },
+		{ page: 0 },
+		{ search: { minRating: 6 } },
+	])('rejects invalid owner inquiry %j', async (input) => {
+		auth.verifyToken.mockResolvedValue({ _id: new Types.ObjectId(), memberType: 'HOTEL_OWNER' });
+		expect((await ownerList(input)).errors).toBeDefined();
+		expect(storage.aggregate).not.toHaveBeenCalled();
+	});
 	const update = (input: unknown, signedIn = true) =>
 		graphql({
 			schema: app.get(GraphQLSchemaHost).schema,
@@ -71,6 +163,71 @@ describe('getHotel GraphQL', () => {
 			variableValues: { input },
 			contextValue: { req: { headers: signedIn ? { authorization: 'Bearer valid' } : {} } },
 		});
+	const remove = (hotelId = String(id), signedIn = true) =>
+		graphql({
+			schema: app.get(GraphQLSchemaHost).schema,
+			source: 'mutation($id:String!){deleteHotel(hotelId:$id){_id hotelStatus deletedAt}}',
+			variableValues: { id: hotelId },
+			contextValue: { req: { headers: signedIn ? { authorization: 'Bearer valid' } : {} } },
+		});
+	it.each(['USER', 'ADMIN', 'GUEST'])('denies hotel deletion from %s', async (role) => {
+		auth.verifyToken.mockResolvedValue({ _id: new Types.ObjectId(), memberType: role });
+		expect((await remove(String(id), role !== 'GUEST')).errors).toBeDefined();
+		expect(connection.transaction).not.toHaveBeenCalled();
+		expect(storage.findOneAndUpdate).not.toHaveBeenCalled();
+	});
+	it('rejects malformed delete IDs before opening a transaction', async () => {
+		auth.verifyToken.mockResolvedValue({ _id: new Types.ObjectId(), memberType: 'HOTEL_OWNER' });
+		expect((await remove('invalid')).errors).toBeDefined();
+		expect(connection.transaction).not.toHaveBeenCalled();
+	});
+	it.each(['ACTIVE', 'PAUSED'])('soft deletes an owned %s hotel and decrements only once', async (status) => {
+		const ownerId = new Types.ObjectId();
+		auth.verifyToken.mockResolvedValue({ _id: ownerId, memberType: 'HOTEL_OWNER' });
+		let hotel = { _id: id, ownerId, hotelStatus: status };
+		storage.findOneAndUpdate.mockImplementation((filter, change, options) => ({
+			exec: async () => {
+				expect(options.session).toBe(session);
+				expect(filter.ownerId).toEqual(ownerId);
+				expect(filter._id).toEqual(id);
+				if (!filter.hotelStatus.$in.includes(hotel.hotelStatus)) return null;
+				hotel = { ...hotel, ...change.$set };
+				return hotel;
+			},
+		}));
+		const first = await remove();
+		expect(first.errors).toBeUndefined();
+		expect(first.data?.deleteHotel).toMatchObject({ hotelStatus: 'DELETE', deletedAt: expect.any(String) });
+		expect(members.memberStatsEditor).toHaveBeenCalledWith(
+			{ _id: ownerId, targetKey: 'memberHotels', modifier: -1 },
+			session,
+		);
+		expect((await remove()).errors).toBeDefined();
+		expect(members.memberStatsEditor).toHaveBeenCalledTimes(1);
+	});
+	it('does not decrement when the hotel ownership/status filter fails', async () => {
+		auth.verifyToken.mockResolvedValue({ _id: new Types.ObjectId(), memberType: 'HOTEL_OWNER' });
+		storage.findOneAndUpdate.mockReturnValue({ exec: async () => null });
+		expect((await remove()).errors).toBeDefined();
+		expect(members.memberStatsEditor).not.toHaveBeenCalled();
+	});
+	it('propagates counter failure out of the transaction callback', async () => {
+		auth.verifyToken.mockResolvedValue({ _id: new Types.ObjectId(), memberType: 'HOTEL_OWNER' });
+		storage.findOneAndUpdate.mockReturnValue({ exec: async () => ({ _id: id, hotelStatus: 'DELETE' }) });
+		const failure = new Error('counter update failed');
+		members.memberStatsEditor.mockRejectedValue(failure);
+		const aborted = jest.fn();
+		connection.transaction.mockImplementation(async (callback) => {
+			try {
+				return await callback(session);
+			} catch (error) {
+				aborted();
+				throw error;
+			}
+		});
+		expect((await remove()).errors?.[0].originalError).toBe(failure);
+		expect(aborted).toHaveBeenCalledTimes(1);
+	});
 	it.each(['USER', 'ADMIN', 'GUEST'])('denies hotel updates from %s', async (role) => {
 		auth.verifyToken.mockResolvedValue({ _id: new Types.ObjectId(), memberType: role });
 		expect((await update({ _id: String(id), hotelName: 'Changed Hotel' }, role !== 'GUEST')).errors).toBeDefined();

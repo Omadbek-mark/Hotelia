@@ -2,7 +2,7 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import { InjectConnection, InjectModel } from '@nestjs/mongoose';
 import { Error as MongooseError, Connection, FilterQuery, Model, Types } from 'mongoose';
 import { Hotel, Hotels } from '../../libs/dto/hotel/hotel';
-import { HotelsInquiry } from '../../libs/dto/hotel/hotel.inquiry';
+import { HotelsInquiry, OwnerHotelsInquiry } from '../../libs/dto/hotel/hotel.inquiry';
 import { escapeSearchText } from '../../libs/search';
 import { MemberStatus, MemberType } from '../../libs/enums/member.enum';
 import { HotelInput } from '../../libs/dto/hotel/hotel.input';
@@ -97,8 +97,46 @@ export class HotelService {
 		}
 	}
 
+	public async deleteHotel(memberId: Types.ObjectId, hotelId: Types.ObjectId): Promise<Hotel> {
+		const search = {
+			_id: hotelId,
+			ownerId: memberId,
+			hotelStatus: { $in: [HotelStatus.ACTIVE, HotelStatus.PAUSED] },
+		};
+
+		// The status change and owner counter must commit together.
+		return await this.connection.transaction(async (session) => {
+			const result = await this.hotelModel
+				.findOneAndUpdate(
+					search,
+					{ $set: { hotelStatus: HotelStatus.DELETE, deletedAt: new Date() } },
+					{ new: true, runValidators: true, session },
+				)
+				.exec();
+			if (!result) throw new NotFoundException(Message.NO_DATA_FOUND);
+
+			await this.memberService.memberStatsEditor({ _id: memberId, targetKey: 'memberHotels', modifier: -1 }, session);
+			return result;
+		});
+	}
+
 	public async getHotels(input: HotelsInquiry): Promise<Hotels> {
 		const match: FilterQuery<Hotel> = { hotelStatus: HotelStatus.ACTIVE };
+		return await this.getHotelList(match, input);
+	}
+
+	public async getOwnerHotels(memberId: Types.ObjectId, input: OwnerHotelsInquiry): Promise<Hotels> {
+		if (input.hotelStatus !== undefined && ![HotelStatus.ACTIVE, HotelStatus.PAUSED].includes(input.hotelStatus)) {
+			throw new BadRequestException(Message.NOT_ALLOWED_REQUEST);
+		}
+		const match: FilterQuery<Hotel> = {
+			ownerId: memberId,
+			hotelStatus: input.hotelStatus ?? { $in: [HotelStatus.ACTIVE, HotelStatus.PAUSED] },
+		};
+		return await this.getHotelList(match, input);
+	}
+
+	private async getHotelList(match: FilterQuery<Hotel>, input: HotelsInquiry): Promise<Hotels> {
 		this.shapeMatchQuery(match, input);
 		const sorts: Record<HotelSort, Record<string, 1 | -1>> = {
 			[HotelSort.NEWEST]: { createdAt: -1, _id: -1 },
@@ -147,6 +185,19 @@ export class HotelService {
 		if (minRating !== undefined) match.hotelRating = { $gte: minRating };
 		// Every selected amenity must be present on the hotel.
 		if (amenities?.length) match.hotelAmenities = { $all: amenities };
+	}
+
+	public async getOwnerHotel(memberId: Types.ObjectId, hotelId: Types.ObjectId): Promise<Hotel> {
+		const search = {
+			_id: hotelId,
+			ownerId: memberId,
+			hotelStatus: { $in: [HotelStatus.ACTIVE, HotelStatus.PAUSED] },
+		};
+		const targetHotel = await this.hotelModel.findOne(search).lean().exec();
+		if (!targetHotel) throw new NotFoundException(Message.NO_DATA_FOUND);
+
+		targetHotel.memberData = await this.memberService.getHotelOwner(targetHotel.ownerId);
+		return targetHotel;
 	}
 
 	public async getHotel(hotelId: Types.ObjectId, memberId?: Types.ObjectId | null): Promise<Hotel> {
