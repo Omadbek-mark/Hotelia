@@ -2,7 +2,8 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import { InjectModel } from '@nestjs/mongoose';
 import { Error as MongooseError, FilterQuery, Model, Types } from 'mongoose';
 import { Room, Rooms } from '../../libs/dto/room/room';
-import { RoomsInquiry } from '../../libs/dto/room/room.inquiry';
+import { OwnerRoomsInquiry, RoomsInquiry } from '../../libs/dto/room/room.inquiry';
+import { RoomUpdate } from '../../libs/dto/room/room.update';
 import { RoomInput } from '../../libs/dto/room/room.input';
 import { shapeIntoMongoObjectId } from '../../libs/config';
 import { RoomSort, RoomStatus } from '../../libs/enums/room.enum';
@@ -21,6 +22,23 @@ export class RoomService {
 		// No memberId: this visibility check does not record a hotel view.
 		await this.hotelService.getHotel(hotelId);
 		const match: FilterQuery<Room> = { hotelId, roomStatus: RoomStatus.ACTIVE };
+		return await this.getRoomList(match, input);
+	}
+
+	public async getOwnerRooms(memberId: Types.ObjectId, input: OwnerRoomsInquiry): Promise<Rooms> {
+		const hotelId = shapeIntoMongoObjectId(input.hotelId);
+		await this.hotelService.getOwnerHotel(memberId, hotelId);
+		if (input.roomStatus !== undefined && ![RoomStatus.ACTIVE, RoomStatus.PAUSED].includes(input.roomStatus)) {
+			throw new BadRequestException(Message.NOT_ALLOWED_REQUEST);
+		}
+		const match: FilterQuery<Room> = {
+			hotelId,
+			roomStatus: input.roomStatus ?? { $in: [RoomStatus.ACTIVE, RoomStatus.PAUSED] },
+		};
+		return await this.getRoomList(match, input);
+	}
+
+	private async getRoomList(match: FilterQuery<Room>, input: RoomsInquiry): Promise<Rooms> {
 		if (input.roomType) match.roomType = input.roomType;
 		const sorts: Record<RoomSort, Record<string, 1 | -1>> = {
 			[RoomSort.NEWEST]: { createdAt: -1, _id: -1 },
@@ -47,6 +65,72 @@ export class RoomService {
 		if (!room) throw new NotFoundException(Message.NO_DATA_FOUND);
 		await this.hotelService.getHotel(room.hotelId);
 		return room;
+	}
+
+	public async getOwnerRoom(memberId: Types.ObjectId, roomId: Types.ObjectId): Promise<Room> {
+		const room = await this.roomModel
+			.findOne({
+				_id: roomId,
+				roomStatus: { $in: [RoomStatus.ACTIVE, RoomStatus.PAUSED] },
+			})
+			.lean()
+			.exec();
+		if (!room) throw new NotFoundException(Message.NO_DATA_FOUND);
+		await this.hotelService.getOwnerHotel(memberId, room.hotelId);
+		return room;
+	}
+
+	public async updateRoom(memberId: Types.ObjectId, input: RoomUpdate): Promise<Room> {
+		const roomId = shapeIntoMongoObjectId(input._id);
+		const room = await this.getOwnerRoom(memberId, roomId);
+		if (input.roomStatus !== undefined && ![RoomStatus.ACTIVE, RoomStatus.PAUSED].includes(input.roomStatus)) {
+			throw new BadRequestException(Message.NOT_ALLOWED_REQUEST);
+		}
+		const changes: Partial<Room> = {};
+		const editableFields = [
+			'roomName',
+			'roomDescription',
+			'roomType',
+			'roomPrice',
+			'roomCapacity',
+			'roomQuantity',
+			'bedType',
+			'roomSize',
+			'roomImages',
+			'roomAmenities',
+			'roomStatus',
+		] as const;
+		for (const field of editableFields) {
+			if (input[field] !== undefined) Object.assign(changes, { [field]: input[field] });
+		}
+		if (!Object.keys(changes).length) throw new BadRequestException(Message.BAD_REQUEST);
+		try {
+			const result = await this.roomModel
+				.findOneAndUpdate(
+					{ _id: roomId, hotelId: room.hotelId, roomStatus: { $in: [RoomStatus.ACTIVE, RoomStatus.PAUSED] } },
+					{ $set: changes },
+					{ new: true, runValidators: true },
+				)
+				.exec();
+			if (!result) throw new NotFoundException(Message.NO_DATA_FOUND);
+			return result;
+		} catch (error) {
+			if (error instanceof MongooseError.ValidationError) throw new BadRequestException(Message.UPDATE_FAILED);
+			throw error;
+		}
+	}
+
+	public async deleteRoom(memberId: Types.ObjectId, roomId: Types.ObjectId): Promise<Room> {
+		const room = await this.getOwnerRoom(memberId, roomId);
+		const result = await this.roomModel
+			.findOneAndUpdate(
+				{ _id: roomId, hotelId: room.hotelId, roomStatus: { $in: [RoomStatus.ACTIVE, RoomStatus.PAUSED] } },
+				{ $set: { roomStatus: RoomStatus.DELETE, deletedAt: new Date() } },
+				{ new: true, runValidators: true },
+			)
+			.exec();
+		if (!result) throw new NotFoundException(Message.NO_DATA_FOUND);
+		return result;
 	}
 
 	public async createRoom(memberId: Types.ObjectId, input: RoomInput): Promise<Room> {
