@@ -11,10 +11,19 @@ import { AuthMember } from '../auth/decorators/authMember.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { RoomService } from './room.service';
+import { AvailableRooms, AvailableRoomsInquiry } from '../../libs/dto/room/room.availability';
 
 @Resolver(() => Room)
 export class RoomResolver {
 	constructor(private readonly roomService: RoomService) {}
+
+	@Query(() => AvailableRooms)
+	public async getAvailableRooms(
+		@Args('input', new ValidationPipe({ transform: true, whitelist: true, forbidNonWhitelisted: true }))
+		input: AvailableRoomsInquiry,
+	): Promise<AvailableRooms> {
+		return await this.roomService.getAvailableRooms(input);
+	}
 
 	@Query(() => Rooms)
 	public async getRooms(

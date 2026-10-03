@@ -1,3 +1,6 @@
+import { AvailableRooms, AvailableRoomsInquiry } from '../../libs/dto/room/room.availability';
+import { assertNotPastCheckIn, getStayDates } from '../../libs/booking/stay-dates';
+import { availableRoomsPipeline } from '../../libs/booking/availability-pipeline';
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Error as MongooseError, FilterQuery, Model, Types } from 'mongoose';
@@ -16,6 +19,15 @@ export class RoomService {
 		@InjectModel('Room') private readonly roomModel: Model<Room>,
 		private readonly hotelService: HotelService,
 	) {}
+
+	public async getAvailableRooms(input: AvailableRoomsInquiry): Promise<AvailableRooms> {
+		const hotelId = shapeIntoMongoObjectId(input.hotelId);
+		const stay = getStayDates(input.checkIn, input.checkOut);
+		const hotel = await this.hotelService.getHotel(hotelId);
+		assertNotPastCheckIn(stay.checkIn, hotel.hotelTimezone);
+		const result = await this.roomModel.aggregate<AvailableRooms>(availableRoomsPipeline(hotelId, input, stay)).exec();
+		return result[0] ?? { list: [], metaCounter: [] };
+	}
 
 	public async getRooms(input: RoomsInquiry): Promise<Rooms> {
 		const hotelId = shapeIntoMongoObjectId(input.hotelId);
