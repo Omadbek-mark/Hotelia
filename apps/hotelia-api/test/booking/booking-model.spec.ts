@@ -36,6 +36,7 @@ describe('Booking schema and input', () => {
 	it('does not accept prices or member identity from the client', async () => {
 		const input = plainToInstance(BookingInput, {
 			roomId: String(new Types.ObjectId()),
+			requestId: '6e4d6758-ed90-44c2-8e8a-d7b26f15a907',
 			checkIn: '2030-09-10',
 			checkOut: '2030-09-15',
 			guests: 2,

@@ -1,9 +1,18 @@
 import { Field, Float, Int, ObjectType } from '@nestjs/graphql';
 import type { Types } from 'mongoose';
+import { TotalCounter } from '../member/member';
 import { BookingStatus } from '../../enums/booking.enum';
 
 @ObjectType()
 export class Booking {
+	@Field(() => String)
+	currency!: string;
+
+	@Field(() => Date, { nullable: true })
+	expiresAt?: Date;
+
+	requestId?: string;
+
 	@Field(() => String)
 	_id!: Types.ObjectId;
 
@@ -45,4 +54,13 @@ export class Booking {
 
 	@Field(() => BookingStatus)
 	bookingStatus!: BookingStatus;
+}
+
+@ObjectType()
+export class Bookings {
+	@Field(() => [Booking])
+	list!: Booking[];
+
+	@Field(() => [TotalCounter])
+	metaCounter!: TotalCounter[];
 }

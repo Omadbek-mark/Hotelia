@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { HotelModule } from './hotel/hotel.module';
 import { RoomModule } from './room/room.module';
+import { BookingModule } from './booking/booking.module';
 import { MemberModule } from './member/member.module';
 import { PropertyModule } from './property/property.module';
 import { AuthModule } from './auth/auth.module';
@@ -14,6 +15,7 @@ import { CommentModule } from './comment/comment.module';
 	imports: [
 		HotelModule,
 		RoomModule,
+		BookingModule,
 		MemberModule,
 		AuthModule,
 		PropertyModule,

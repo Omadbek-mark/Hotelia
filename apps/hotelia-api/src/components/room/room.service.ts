@@ -1,9 +1,11 @@
+import { Booking } from '../../libs/dto/booking/booking';
+import { inventoryBookingFilter } from '../../libs/booking/inventory';
 import { AvailableRooms, AvailableRoomsInquiry } from '../../libs/dto/room/room.availability';
 import { assertNotPastCheckIn, getStayDates } from '../../libs/booking/stay-dates';
 import { availableRoomsPipeline } from '../../libs/booking/availability-pipeline';
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { InjectModel } from '@nestjs/mongoose';
-import { Error as MongooseError, FilterQuery, Model, Types } from 'mongoose';
+import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { InjectConnection, InjectModel } from '@nestjs/mongoose';
+import { Error as MongooseError, Connection, FilterQuery, Model, Types } from 'mongoose';
 import { Room, Rooms } from '../../libs/dto/room/room';
 import { OwnerRoomsInquiry, RoomsInquiry } from '../../libs/dto/room/room.inquiry';
 import { RoomUpdate } from '../../libs/dto/room/room.update';
@@ -18,6 +20,8 @@ export class RoomService {
 	constructor(
 		@InjectModel('Room') private readonly roomModel: Model<Room>,
 		private readonly hotelService: HotelService,
+		@InjectConnection() private readonly connection: Connection,
+		@InjectModel('Booking') private readonly bookingModel: Model<Booking>,
 	) {}
 
 	public async getAvailableRooms(input: AvailableRoomsInquiry): Promise<AvailableRooms> {
@@ -117,15 +121,35 @@ export class RoomService {
 		}
 		if (!Object.keys(changes).length) throw new BadRequestException(Message.BAD_REQUEST);
 		try {
-			const result = await this.roomModel
-				.findOneAndUpdate(
-					{ _id: roomId, hotelId: room.hotelId, roomStatus: { $in: [RoomStatus.ACTIVE, RoomStatus.PAUSED] } },
-					{ $set: changes },
-					{ new: true, runValidators: true },
-				)
-				.exec();
-			if (!result) throw new NotFoundException(Message.NO_DATA_FOUND);
-			return result;
+			return await this.connection.transaction(async (session) => {
+				await this.hotelService.lockBookingHotel(room.hotelId, session, memberId);
+				// Read again in the transaction; the earlier read only locates the owning hotel.
+				const current = await this.roomModel
+					.findOne({ _id: roomId, hotelId: room.hotelId, roomStatus: { $in: [RoomStatus.ACTIVE, RoomStatus.PAUSED] } })
+					.session(session)
+					.lean()
+					.exec();
+				if (!current) throw new NotFoundException(Message.NO_DATA_FOUND);
+				if (
+					(input.roomQuantity !== undefined && input.roomQuantity < current.roomQuantity) ||
+					(input.roomCapacity !== undefined && input.roomCapacity < current.roomCapacity)
+				) {
+					const booked = await this.bookingModel
+						.exists({ roomId, ...inventoryBookingFilter(new Date()) })
+						.session(session)
+						.exec();
+					if (booked) throw new ConflictException('Cannot reduce inventory or capacity while active bookings exist');
+				}
+				const result = await this.roomModel
+					.findOneAndUpdate(
+						{ _id: roomId, hotelId: room.hotelId, roomStatus: { $in: [RoomStatus.ACTIVE, RoomStatus.PAUSED] } },
+						{ $set: changes },
+						{ new: true, runValidators: true, session },
+					)
+					.exec();
+				if (!result) throw new NotFoundException(Message.NO_DATA_FOUND);
+				return result;
+			});
 		} catch (error) {
 			if (error instanceof MongooseError.ValidationError) throw new BadRequestException(Message.UPDATE_FAILED);
 			throw error;
@@ -134,15 +158,23 @@ export class RoomService {
 
 	public async deleteRoom(memberId: Types.ObjectId, roomId: Types.ObjectId): Promise<Room> {
 		const room = await this.getOwnerRoom(memberId, roomId);
-		const result = await this.roomModel
-			.findOneAndUpdate(
-				{ _id: roomId, hotelId: room.hotelId, roomStatus: { $in: [RoomStatus.ACTIVE, RoomStatus.PAUSED] } },
-				{ $set: { roomStatus: RoomStatus.DELETE, deletedAt: new Date() } },
-				{ new: true, runValidators: true },
-			)
-			.exec();
-		if (!result) throw new NotFoundException(Message.NO_DATA_FOUND);
-		return result;
+		return await this.connection.transaction(async (session) => {
+			await this.hotelService.lockBookingHotel(room.hotelId, session, memberId);
+			const booked = await this.bookingModel
+				.exists({ roomId, ...inventoryBookingFilter(new Date()) })
+				.session(session)
+				.exec();
+			if (booked) throw new ConflictException('Room has active bookings');
+			const result = await this.roomModel
+				.findOneAndUpdate(
+					{ _id: roomId, hotelId: room.hotelId, roomStatus: { $in: [RoomStatus.ACTIVE, RoomStatus.PAUSED] } },
+					{ $set: { roomStatus: RoomStatus.DELETE, deletedAt: new Date() } },
+					{ new: true, runValidators: true, session },
+				)
+				.exec();
+			if (!result) throw new NotFoundException(Message.NO_DATA_FOUND);
+			return result;
+		});
 	}
 
 	public async createRoom(memberId: Types.ObjectId, input: RoomInput): Promise<Room> {

@@ -1,9 +1,13 @@
+import { BOOKING_CURRENCY, isUsdAmount } from '../libs/booking/money';
 import { Schema } from 'mongoose';
 import { BookingStatus } from '../libs/enums/booking.enum';
 import { DAY_MS } from '../libs/booking/stay-dates';
 
 const BookingSchema = new Schema(
 	{
+		requestId: { type: String, immutable: true, lowercase: true },
+		currency: { type: String, enum: [BOOKING_CURRENCY], default: BOOKING_CURRENCY, required: true, immutable: true },
+		expiresAt: { type: Date },
 		memberId: { type: Schema.Types.ObjectId, ref: 'Member', required: true, immutable: true },
 		hotelId: { type: Schema.Types.ObjectId, ref: 'Hotel', required: true, immutable: true },
 		roomId: { type: Schema.Types.ObjectId, ref: 'Room', required: true, immutable: true },
@@ -38,7 +42,7 @@ const BookingSchema = new Schema(
 			immutable: true,
 			min: 0.01,
 			max: Number.MAX_SAFE_INTEGER / 100,
-			validate: Number.isFinite,
+			validate: isUsdAmount,
 		},
 		totalPrice: {
 			type: Number,
@@ -46,7 +50,7 @@ const BookingSchema = new Schema(
 			immutable: true,
 			min: 0.01,
 			max: Number.MAX_SAFE_INTEGER / 100,
-			validate: Number.isFinite,
+			validate: isUsdAmount,
 		},
 		bookingStatus: { type: String, enum: BookingStatus, required: true, default: BookingStatus.PENDING },
 	},
@@ -63,4 +67,8 @@ BookingSchema.path('nights').validate(function (value: number) {
 BookingSchema.index({ roomId: 1, bookingStatus: 1, checkIn: 1, checkOut: 1 });
 BookingSchema.index({ memberId: 1, createdAt: -1 });
 BookingSchema.index({ hotelId: 1, createdAt: -1 });
+BookingSchema.index(
+	{ memberId: 1, requestId: 1 },
+	{ unique: true, partialFilterExpression: { requestId: { $type: 'string' } } },
+);
 export default BookingSchema;

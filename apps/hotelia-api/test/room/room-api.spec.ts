@@ -1,6 +1,6 @@
 import { INestApplication, NotFoundException } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
-import { getModelToken } from '@nestjs/mongoose';
+import { getConnectionToken, getModelToken } from '@nestjs/mongoose';
 import { ApolloDriver } from '@nestjs/apollo';
 import { GraphQLModule, GraphQLSchemaHost } from '@nestjs/graphql';
 import { graphql } from 'graphql';
@@ -30,7 +30,10 @@ const validInput = () => ({
 describe('Room GraphQL API', () => {
 	let app: INestApplication;
 	const storage = { create: jest.fn(), findOne: jest.fn(), aggregate: jest.fn(), findOneAndUpdate: jest.fn() };
-	const hotels = { getOwnerHotel: jest.fn(), getHotel: jest.fn() };
+	const hotels = { getOwnerHotel: jest.fn(), getHotel: jest.fn(), lockBookingHotel: jest.fn() };
+	const session = {};
+	const connection = { transaction: jest.fn() };
+	const bookings = { exists: jest.fn() };
 	const auth = { verifyToken: jest.fn() };
 	beforeAll(async () => {
 		const module = await Test.createTestingModule({
@@ -39,6 +42,8 @@ describe('Room GraphQL API', () => {
 				RoomService,
 				RoomResolver,
 				{ provide: getModelToken('Room'), useValue: storage },
+				{ provide: getModelToken('Booking'), useValue: bookings },
+				{ provide: getConnectionToken(), useValue: connection },
 				{ provide: HotelService, useValue: hotels },
 				{ provide: AuthService, useValue: auth },
 			],
@@ -50,14 +55,17 @@ describe('Room GraphQL API', () => {
 	afterAll(async () => app?.close());
 	beforeEach(() => {
 		jest.resetAllMocks();
+		connection.transaction.mockImplementation(async (callback) => callback(session));
+		bookings.exists.mockReturnValue({ session: () => ({ exec: async () => null }) });
+		hotels.lockBookingHotel.mockResolvedValue({ _id: hotelId });
 		auth.verifyToken.mockResolvedValue({ _id: memberId, memberType: 'HOTEL_OWNER' });
 		hotels.getOwnerHotel.mockResolvedValue({ _id: hotelId });
 		hotels.getHotel.mockResolvedValue({ _id: hotelId, hotelTimezone: 'Asia/Seoul' });
 		storage.create.mockImplementation(async (input) => ({ _id: roomId, ...input }));
 		storage.aggregate.mockReturnValue({ exec: async () => [{ list: [], metaCounter: [] }] });
-		storage.findOne.mockReturnValue({
-			lean: () => ({ exec: async () => ({ _id: roomId, hotelId, roomStatus: 'ACTIVE' }) }),
-		});
+		const room = { _id: roomId, hotelId, roomStatus: 'ACTIVE', roomQuantity: 5, roomCapacity: 2 };
+		const query = { lean: () => ({ exec: async () => room }) };
+		storage.findOne.mockReturnValue({ ...query, session: () => query });
 	});
 	const run = (source: string, variableValues: Record<string, unknown>, signedIn = false) =>
 		graphql({
@@ -101,7 +109,9 @@ describe('Room GraphQL API', () => {
 			roomCapacity: { $gte: 2 },
 		});
 		const overlap = pipeline[1].$lookup.pipeline[0].$match;
-		expect(overlap.bookingStatus.$in).toEqual(['PENDING', 'CONFIRMED']);
+		expect(overlap.$or[0]).toEqual({ bookingStatus: 'CONFIRMED' });
+		expect(overlap.$or[1].bookingStatus).toBe('PENDING');
+		expect(overlap.$or[1].$or[0].expiresAt.$gt).toBeInstanceOf(Date);
 		expect(overlap.checkIn).toEqual({ $lt: new Date('2035-09-15') });
 		expect(overlap.checkOut).toEqual({ $gt: new Date('2035-09-10') });
 		expect(pipeline[2].$set.nightlyBooked.$map.input).toEqual({ $range: [0, 5] });
@@ -207,7 +217,7 @@ describe('Room GraphQL API', () => {
 		expect(storage.findOneAndUpdate).toHaveBeenCalledWith(
 			{ _id: roomId, hotelId, roomStatus: { $in: ['ACTIVE', 'PAUSED'] } },
 			{ $set: { roomPrice: 150, roomStatus, roomAmenities: [] } },
-			{ new: true, runValidators: true },
+			{ new: true, runValidators: true, session },
 		);
 	});
 	it('cannot change parent or timestamps through a direct service update', async () => {

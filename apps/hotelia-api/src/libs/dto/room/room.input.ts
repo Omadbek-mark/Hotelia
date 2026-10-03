@@ -38,7 +38,7 @@ export class RoomInput {
 	@Field(() => RoomType)
 	roomType!: RoomType;
 
-	@IsNumber()
+	@IsNumber({ maxDecimalPlaces: 2 })
 	@Min(0.01)
 	@Max(Number.MAX_SAFE_INTEGER / 100)
 	@Field(() => Float)

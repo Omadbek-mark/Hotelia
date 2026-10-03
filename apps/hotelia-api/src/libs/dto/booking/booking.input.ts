@@ -1,5 +1,5 @@
 import { Field, InputType, Int } from '@nestjs/graphql';
-import { IsInt, IsMongoId, IsString, Matches, Max, Min } from 'class-validator';
+import { IsInt, IsMongoId, IsString, IsUUID, Matches, Max, Min } from 'class-validator';
 
 @InputType()
 export class StayInput {
@@ -29,6 +29,10 @@ export class StayInput {
 // Member, hotel, nights and prices will be resolved by the server when creating a booking.
 @InputType()
 export class BookingInput extends StayInput {
+	@IsUUID('4')
+	@Field(() => String)
+	requestId!: string;
+
 	@IsMongoId()
 	@Field(() => String)
 	roomId!: string;
