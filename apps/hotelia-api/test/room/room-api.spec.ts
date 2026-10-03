@@ -52,7 +52,7 @@ describe('Room GraphQL API', () => {
 		jest.resetAllMocks();
 		auth.verifyToken.mockResolvedValue({ _id: memberId, memberType: 'HOTEL_OWNER' });
 		hotels.getOwnerHotel.mockResolvedValue({ _id: hotelId });
-		hotels.getHotel.mockResolvedValue({ _id: hotelId });
+		hotels.getHotel.mockResolvedValue({ _id: hotelId, hotelTimezone: 'Asia/Seoul' });
 		storage.create.mockImplementation(async (input) => ({ _id: roomId, ...input }));
 		storage.aggregate.mockReturnValue({ exec: async () => [{ list: [], metaCounter: [] }] });
 		storage.findOne.mockReturnValue({
@@ -76,6 +76,64 @@ describe('Room GraphQL API', () => {
 		run('query($input:RoomsInquiry!){getRooms(input:$input){list{_id} metaCounter{total}}}', { input });
 	const detail = (id = String(roomId)) => run('query($id:String!){getRoom(roomId:$id){_id roomStatus}}', { id });
 
+	const available = (change: Record<string, unknown> = {}) =>
+		run(
+			'query($input:AvailableRoomsInquiry!){getAvailableRooms(input:$input){list{_id availableQuantity} metaCounter{total}}}',
+			{
+				input: {
+					hotelId: String(hotelId),
+					checkIn: '2035-09-10',
+					checkOut: '2035-09-15',
+					guests: 3,
+					rooms: 2,
+					...change,
+				},
+			},
+		);
+	it('builds checkout-exclusive availability and paginates after inventory filtering', async () => {
+		expect((await available()).errors).toBeUndefined();
+		expect(hotels.getHotel).toHaveBeenCalledWith(hotelId);
+		const pipeline = storage.aggregate.mock.calls[0][0];
+		expect(pipeline[0].$match).toEqual({
+			hotelId,
+			roomStatus: 'ACTIVE',
+			roomQuantity: { $gte: 2 },
+			roomCapacity: { $gte: 2 },
+		});
+		const overlap = pipeline[1].$lookup.pipeline[0].$match;
+		expect(overlap.bookingStatus.$in).toEqual(['PENDING', 'CONFIRMED']);
+		expect(overlap.checkIn).toEqual({ $lt: new Date('2035-09-15') });
+		expect(overlap.checkOut).toEqual({ $gt: new Date('2035-09-10') });
+		expect(pipeline[2].$set.nightlyBooked.$map.input).toEqual({ $range: [0, 5] });
+		expect(pipeline[4].$match).toEqual({ availableQuantity: { $gte: 2 } });
+		expect(pipeline[pipeline.length - 1].$facet.metaCounter).toEqual([{ $count: 'total' }]);
+	});
+	it.each([
+		{ checkIn: '2035-02-30' },
+		{ checkOut: '2035-09-10' },
+		{ checkOut: '2037-09-10' },
+		{ guests: 0 },
+		{ rooms: 0 },
+		{ limit: 101 },
+		{ checkIn: '2000-01-01', checkOut: '2000-01-02' },
+	])('rejects invalid availability %j', async (input) => {
+		expect((await available(input)).errors).toBeDefined();
+		expect(storage.aggregate).not.toHaveBeenCalled();
+	});
+	it('does not search availability for an unavailable hotel', async () => {
+		hotels.getHotel.mockRejectedValue(new NotFoundException());
+		expect((await available()).errors).toBeDefined();
+		expect(storage.aggregate).not.toHaveBeenCalled();
+	});
+	it('propagates availability database errors', async () => {
+		const error = new Error('database unavailable');
+		storage.aggregate.mockReturnValue({
+			exec: async () => {
+				throw error;
+			},
+		});
+		expect((await available()).errors?.[0].originalError).toBe(error);
+	});
 	const ownerList = (input: unknown = { hotelId: String(hotelId) }, signedIn = true) =>
 		run(
 			'query($input:OwnerRoomsInquiry!){getOwnerRooms(input:$input){list{_id} metaCounter{total}}}',
