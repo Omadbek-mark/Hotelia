@@ -16,6 +16,7 @@ describe('getHotel GraphQL', () => {
 	let app: INestApplication;
 	const id = new Types.ObjectId();
 	const storage = { findOne: jest.fn(), findOneAndUpdate: jest.fn(), aggregate: jest.fn() };
+	const bookings = { exists: jest.fn() };
 	const members = { getHotelOwner: jest.fn(), memberStatsEditor: jest.fn() };
 	const views = { recordView: jest.fn() };
 	const session = {};
@@ -30,6 +31,7 @@ describe('getHotel GraphQL', () => {
 				{ provide: getConnectionToken(), useValue: connection },
 				{ provide: ViewService, useValue: views },
 				{ provide: getModelToken('Hotel'), useValue: storage },
+				{ provide: getModelToken('Booking'), useValue: bookings },
 				{ provide: MemberService, useValue: members },
 				{ provide: AuthService, useValue: auth },
 			],
@@ -41,6 +43,7 @@ describe('getHotel GraphQL', () => {
 	afterAll(async () => app?.close());
 	beforeEach(() => {
 		jest.resetAllMocks();
+		bookings.exists.mockReturnValue({ session: () => ({ exec: async () => null }) });
 		connection.transaction.mockImplementation(async (callback) => callback(session));
 		members.getHotelOwner.mockResolvedValue(null);
 		storage.findOne.mockReturnValue({

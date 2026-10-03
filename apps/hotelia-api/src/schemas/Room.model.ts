@@ -1,8 +1,10 @@
+import { isUsdAmount } from '../libs/booking/money';
 import { Schema } from 'mongoose';
 import { BedType, RoomAmenity, RoomStatus, RoomType } from '../libs/enums/room.enum';
 
 const RoomSchema = new Schema(
 	{
+		bookingVersion: { type: Number, default: 0, select: false },
 		hotelId: { type: Schema.Types.ObjectId, ref: 'Hotel', required: true, immutable: true },
 		roomName: {
 			type: String,
@@ -28,7 +30,7 @@ const RoomSchema = new Schema(
 			required: true,
 			min: 0.01,
 			max: Number.MAX_SAFE_INTEGER / 100,
-			validate: Number.isFinite,
+			validate: isUsdAmount,
 		},
 		roomCapacity: {
 			type: Number,

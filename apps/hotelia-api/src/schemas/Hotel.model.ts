@@ -4,6 +4,7 @@ import { HotelAmenity, HotelStatus, HotelType } from '../libs/enums/hotel.enum';
 
 const HotelSchema = new Schema(
 	{
+		bookingVersion: { type: Number, default: 0, select: false },
 		ownerId: {
 			type: Schema.Types.ObjectId,
 			ref: 'Member',

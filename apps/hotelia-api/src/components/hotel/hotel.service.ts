@@ -1,6 +1,8 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectConnection, InjectModel } from '@nestjs/mongoose';
-import { Error as MongooseError, Connection, FilterQuery, Model, Types } from 'mongoose';
+import { Error as MongooseError, ClientSession, Connection, FilterQuery, Model, Types } from 'mongoose';
+import { Booking } from '../../libs/dto/booking/booking';
+import { inventoryBookingFilter } from '../../libs/booking/inventory';
 import { Hotel, Hotels } from '../../libs/dto/hotel/hotel';
 import { HotelsInquiry, OwnerHotelsInquiry } from '../../libs/dto/hotel/hotel.inquiry';
 import { escapeSearchText } from '../../libs/search';
@@ -21,7 +23,31 @@ export class HotelService {
 		private readonly memberService: MemberService,
 		private readonly viewService: ViewService,
 		@InjectModel('Hotel') private readonly hotelModel: Model<Hotel>,
+		@InjectModel('Booking') private readonly bookingModel: Model<Booking>,
 	) {}
+
+	// A real write serializes booking creation with hotel/room inventory changes.
+	public async lockBookingHotel(
+		hotelId: Types.ObjectId,
+		session: ClientSession,
+		ownerId?: Types.ObjectId,
+	): Promise<Hotel> {
+		const hotel = await this.hotelModel
+			.findOneAndUpdate(
+				{
+					_id: hotelId,
+					...(ownerId
+						? { ownerId, hotelStatus: { $in: [HotelStatus.ACTIVE, HotelStatus.PAUSED] } }
+						: { hotelStatus: HotelStatus.ACTIVE }),
+				},
+				{ $inc: { bookingVersion: 1 } },
+				{ new: true, session, timestamps: false },
+			)
+			.lean()
+			.exec();
+		if (!hotel) throw new NotFoundException(Message.NO_DATA_FOUND);
+		return hotel;
+	}
 
 	public async createHotel(input: HotelInput): Promise<Hotel> {
 		try {
@@ -114,6 +140,12 @@ export class HotelService {
 				)
 				.exec();
 			if (!result) throw new NotFoundException(Message.NO_DATA_FOUND);
+
+			const hasBookings = await this.bookingModel
+				.exists({ hotelId, ...inventoryBookingFilter(new Date()) })
+				.session(session)
+				.exec();
+			if (hasBookings) throw new ConflictException('Hotel has active bookings');
 
 			await this.memberService.memberStatsEditor({ _id: memberId, targetKey: 'memberHotels', modifier: -1 }, session);
 			return result;

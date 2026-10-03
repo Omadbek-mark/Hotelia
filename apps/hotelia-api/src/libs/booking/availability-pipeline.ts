@@ -1,7 +1,7 @@
 import { FilterQuery, PipelineStage, Types } from 'mongoose';
 import { Room } from '../dto/room/room';
 import { AvailableRoomsInquiry } from '../dto/room/room.availability';
-import { BookingStatus } from '../enums/booking.enum';
+import { inventoryBookingFilter } from './inventory';
 import { RoomSort, RoomStatus } from '../enums/room.enum';
 import { DAY_MS, getStayDates } from './stay-dates';
 
@@ -9,6 +9,7 @@ export function availableRoomsPipeline(
 	hotelId: Types.ObjectId,
 	input: AvailableRoomsInquiry,
 	stay: ReturnType<typeof getStayDates>,
+	now = new Date(),
 ): PipelineStage[] {
 	const match: FilterQuery<Room> = {
 		hotelId,
@@ -33,7 +34,7 @@ export function availableRoomsPipeline(
 					{
 						$match: {
 							$expr: { $eq: ['$roomId', '$$roomId'] },
-							bookingStatus: { $in: [BookingStatus.PENDING, BookingStatus.CONFIRMED] },
+							...inventoryBookingFilter(now),
 							checkIn: { $lt: stay.checkOut },
 							checkOut: { $gt: stay.checkIn },
 						},

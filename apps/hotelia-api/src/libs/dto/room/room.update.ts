@@ -44,7 +44,7 @@ export class RoomUpdate {
 	roomType?: RoomType;
 
 	@ValidateIf((_, value) => value !== undefined)
-	@IsNumber()
+	@IsNumber({ maxDecimalPlaces: 2 })
 	@Min(0.01)
 	@Max(Number.MAX_SAFE_INTEGER / 100)
 	@Field(() => Float, { nullable: true })
