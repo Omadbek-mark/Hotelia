@@ -2,7 +2,8 @@ import { UseGuards, ValidationPipe } from '@nestjs/common';
 import { Args, Mutation, Query, Resolver } from '@nestjs/graphql';
 import { Types } from 'mongoose';
 import { Room, Rooms } from '../../libs/dto/room/room';
-import { RoomsInquiry } from '../../libs/dto/room/room.inquiry';
+import { OwnerRoomsInquiry, RoomsInquiry } from '../../libs/dto/room/room.inquiry';
+import { RoomUpdate } from '../../libs/dto/room/room.update';
 import { shapeIntoMongoObjectId } from '../../libs/config';
 import { RoomInput } from '../../libs/dto/room/room.input';
 import { MemberType } from '../../libs/enums/member.enum';
@@ -26,6 +27,42 @@ export class RoomResolver {
 	@Query(() => Room)
 	public async getRoom(@Args('roomId') input: string): Promise<Room> {
 		return await this.roomService.getRoom(shapeIntoMongoObjectId(input));
+	}
+
+	@Roles(MemberType.HOTEL_OWNER)
+	@UseGuards(RolesGuard)
+	@Query(() => Rooms)
+	public async getOwnerRooms(
+		@AuthMember('_id') memberId: Types.ObjectId,
+		@Args('input', new ValidationPipe({ transform: true, whitelist: true, forbidNonWhitelisted: true }))
+		input: OwnerRoomsInquiry,
+	): Promise<Rooms> {
+		return await this.roomService.getOwnerRooms(memberId, input);
+	}
+
+	@Roles(MemberType.HOTEL_OWNER)
+	@UseGuards(RolesGuard)
+	@Query(() => Room)
+	public async getOwnerRoom(@AuthMember('_id') memberId: Types.ObjectId, @Args('roomId') input: string): Promise<Room> {
+		return await this.roomService.getOwnerRoom(memberId, shapeIntoMongoObjectId(input));
+	}
+
+	@Roles(MemberType.HOTEL_OWNER)
+	@UseGuards(RolesGuard)
+	@Mutation(() => Room)
+	public async updateRoom(
+		@AuthMember('_id') memberId: Types.ObjectId,
+		@Args('input', new ValidationPipe({ transform: true, whitelist: true, forbidNonWhitelisted: true }))
+		input: RoomUpdate,
+	): Promise<Room> {
+		return await this.roomService.updateRoom(memberId, input);
+	}
+
+	@Roles(MemberType.HOTEL_OWNER)
+	@UseGuards(RolesGuard)
+	@Mutation(() => Room)
+	public async deleteRoom(@AuthMember('_id') memberId: Types.ObjectId, @Args('roomId') input: string): Promise<Room> {
+		return await this.roomService.deleteRoom(memberId, shapeIntoMongoObjectId(input));
 	}
 
 	@Roles(MemberType.HOTEL_OWNER)

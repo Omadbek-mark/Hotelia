@@ -29,7 +29,7 @@ const validInput = () => ({
 
 describe('Room GraphQL API', () => {
 	let app: INestApplication;
-	const storage = { create: jest.fn(), findOne: jest.fn(), aggregate: jest.fn() };
+	const storage = { create: jest.fn(), findOne: jest.fn(), aggregate: jest.fn(), findOneAndUpdate: jest.fn() };
 	const hotels = { getOwnerHotel: jest.fn(), getHotel: jest.fn() };
 	const auth = { verifyToken: jest.fn() };
 	beforeAll(async () => {
@@ -76,6 +76,136 @@ describe('Room GraphQL API', () => {
 		run('query($input:RoomsInquiry!){getRooms(input:$input){list{_id} metaCounter{total}}}', { input });
 	const detail = (id = String(roomId)) => run('query($id:String!){getRoom(roomId:$id){_id roomStatus}}', { id });
 
+	const ownerList = (input: unknown = { hotelId: String(hotelId) }, signedIn = true) =>
+		run(
+			'query($input:OwnerRoomsInquiry!){getOwnerRooms(input:$input){list{_id} metaCounter{total}}}',
+			{ input },
+			signedIn,
+		);
+	const ownerDetail = (id = String(roomId), signedIn = true) =>
+		run('query($id:String!){getOwnerRoom(roomId:$id){_id roomStatus}}', { id }, signedIn);
+	const update = (input: unknown = { _id: String(roomId), roomPrice: 150 }, signedIn = true) =>
+		run('mutation($input:RoomUpdate!){updateRoom(input:$input){_id roomStatus roomPrice}}', { input }, signedIn);
+	const remove = (id = String(roomId), signedIn = true) =>
+		run('mutation($id:String!){deleteRoom(roomId:$id){_id roomStatus deletedAt}}', { id }, signedIn);
+
+	it.each(['USER', 'ADMIN', 'GUEST'])('denies all owner room operations to %s', async (role) => {
+		auth.verifyToken.mockResolvedValue({ _id: memberId, memberType: role });
+		const signedIn = role !== 'GUEST';
+		for (const result of [
+			await ownerList(undefined, signedIn),
+			await ownerDetail(undefined, signedIn),
+			await update(undefined, signedIn),
+			await remove(undefined, signedIn),
+		]) {
+			expect(result.errors).toBeDefined();
+		}
+		expect(storage.findOne).not.toHaveBeenCalled();
+		expect(storage.findOneAndUpdate).not.toHaveBeenCalled();
+		expect(storage.aggregate).not.toHaveBeenCalled();
+	});
+	it.each([undefined, 'ACTIVE', 'PAUSED'])('lists owned rooms with status %s and pagination', async (roomStatus) => {
+		expect((await ownerList({ hotelId: String(hotelId), roomStatus, page: 2, limit: 5 })).errors).toBeUndefined();
+		expect(hotels.getOwnerHotel).toHaveBeenCalledWith(memberId, hotelId);
+		const pipeline = storage.aggregate.mock.calls[0][0];
+		expect(pipeline[0].$match).toEqual({ hotelId, roomStatus: roomStatus ?? { $in: ['ACTIVE', 'PAUSED'] } });
+		expect(pipeline[2].$facet.list).toEqual([{ $skip: 5 }, { $limit: 5 }]);
+	});
+	it('rejects DELETE in owner list', async () => {
+		expect((await ownerList({ hotelId: String(hotelId), roomStatus: 'DELETE' })).errors).toBeDefined();
+		expect(storage.aggregate).not.toHaveBeenCalled();
+	});
+	it('checks the hotel owner before returning a room detail', async () => {
+		expect((await ownerDetail()).errors).toBeUndefined();
+		expect(hotels.getOwnerHotel).toHaveBeenCalledWith(memberId, hotelId);
+		expect(storage.findOne).toHaveBeenCalledWith({ _id: roomId, roomStatus: { $in: ['ACTIVE', 'PAUSED'] } });
+	});
+	it('denies read and write operations when hotel ownership/status check fails', async () => {
+		hotels.getOwnerHotel.mockRejectedValue(new NotFoundException());
+		for (const result of [await ownerList(), await ownerDetail(), await update(), await remove()])
+			expect(result.errors).toBeDefined();
+		expect(storage.findOneAndUpdate).not.toHaveBeenCalled();
+		expect(storage.aggregate).not.toHaveBeenCalled();
+	});
+	it.each([
+		{ _id: 'invalid' },
+		{ _id: String(roomId) },
+		{ _id: String(roomId), roomPrice: null },
+		{ _id: String(roomId), roomQuantity: 1.5 },
+		{ _id: String(roomId), roomStatus: 'DELETE' },
+		{ _id: String(roomId), hotelId: String(hotelId) },
+		{ _id: String(roomId), roomImages: [] },
+	])('rejects invalid room updates %j', async (input) => {
+		expect((await update(input)).errors).toBeDefined();
+		expect(storage.findOneAndUpdate).not.toHaveBeenCalled();
+	});
+	it.each(['ACTIVE', 'PAUSED'])('updates allowed fields and status to %s', async (roomStatus) => {
+		storage.findOneAndUpdate.mockImplementation((filter, change) => ({
+			exec: async () => ({ _id: roomId, roomPrice: 150, ...change.$set }),
+		}));
+		expect(
+			(await update({ _id: String(roomId), roomPrice: 150, roomStatus, roomAmenities: [] })).errors,
+		).toBeUndefined();
+		expect(storage.findOneAndUpdate).toHaveBeenCalledWith(
+			{ _id: roomId, hotelId, roomStatus: { $in: ['ACTIVE', 'PAUSED'] } },
+			{ $set: { roomPrice: 150, roomStatus, roomAmenities: [] } },
+			{ new: true, runValidators: true },
+		);
+	});
+	it('cannot change parent or timestamps through a direct service update', async () => {
+		storage.findOneAndUpdate.mockReturnValue({ exec: async () => ({ _id: roomId }) });
+		await app.get(RoomService).updateRoom(memberId, {
+			_id: String(roomId),
+			roomPrice: 150,
+			hotelId: String(new Types.ObjectId()),
+			deletedAt: new Date(),
+		} as any);
+		expect(storage.findOneAndUpdate.mock.calls[0][1]).toEqual({ $set: { roomPrice: 150 } });
+	});
+	it('soft deletes the room and rejects a repeat deletion', async () => {
+		let status = 'ACTIVE';
+		storage.findOne.mockImplementation(() => ({
+			lean: () => ({ exec: async () => (status === 'DELETE' ? null : { _id: roomId, hotelId, roomStatus: status }) }),
+		}));
+		storage.findOneAndUpdate.mockImplementation((filter, change) => ({
+			exec: async () => {
+				expect(filter).toEqual({ _id: roomId, hotelId, roomStatus: { $in: ['ACTIVE', 'PAUSED'] } });
+				status = change.$set.roomStatus;
+				return { _id: roomId, ...change.$set };
+			},
+		}));
+		const first = await remove();
+		expect(first.errors).toBeUndefined();
+		expect(first.data?.deleteRoom).toMatchObject({ roomStatus: 'DELETE', deletedAt: expect.any(String) });
+		expect((await remove()).errors).toBeDefined();
+		expect(storage.findOneAndUpdate).toHaveBeenCalledTimes(1);
+	});
+	it('rejects writes when a room disappears after the ownership check', async () => {
+		storage.findOneAndUpdate.mockReturnValue({ exec: async () => null });
+		expect(((await update()).errors?.[0].originalError as any).getStatus()).toBe(404);
+		expect(((await remove()).errors?.[0].originalError as any).getStatus()).toBe(404);
+	});
+	it('maps update validation errors and propagates infrastructure errors', async () => {
+		storage.findOneAndUpdate.mockReturnValue({
+			exec: async () => {
+				throw new MongooseError.ValidationError();
+			},
+		});
+		expect(((await update()).errors?.[0].originalError as any).getStatus()).toBe(400);
+		const error = new Error('database unavailable');
+		storage.findOneAndUpdate.mockReturnValue({
+			exec: async () => {
+				throw error;
+			},
+		});
+		expect((await update()).errors?.[0].originalError).toBe(error);
+		expect((await remove()).errors?.[0].originalError).toBe(error);
+	});
+	it('rejects invalid owner detail and deletion IDs before database access', async () => {
+		expect((await ownerDetail('invalid')).errors).toBeDefined();
+		expect((await remove('invalid')).errors).toBeDefined();
+		expect(storage.findOne).not.toHaveBeenCalled();
+	});
 	it('creates a room after checking the authenticated hotel owner', async () => {
 		const result = await create();
 		expect(result.errors).toBeUndefined();
