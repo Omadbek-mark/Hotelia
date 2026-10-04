@@ -51,6 +51,31 @@ describe('Booking read API', () => {
 		});
 	const detail = (id = String(bookingId), signedIn = true) =>
 		run('query($id:String!){getBooking(bookingId:$id){_id memberId bookingStatus totalPrice}}', { id }, signedIn);
+	it.each(['confirmBooking', 'cancelBooking', 'completeBooking'] as const)(
+		'%s validates identity, role and ObjectId before calling the service',
+		async (action) => {
+			const spy = jest.spyOn(app.get(BookingService), action).mockResolvedValue({ _id: bookingId } as any);
+			const mutation = (id = String(bookingId), signedIn = true) =>
+				run(`mutation($id:String!){${action}(bookingId:$id){_id}}`, { id }, signedIn);
+			try {
+				expect((await mutation(undefined, false)).errors).toBeDefined();
+				if (action !== 'cancelBooking') {
+					expect((await mutation()).errors).toBeDefined();
+					auth.verifyToken.mockResolvedValue({ _id: memberId, memberType: 'ADMIN' });
+					expect((await mutation()).errors).toBeDefined();
+				}
+				auth.verifyToken.mockResolvedValue({ _id: memberId, memberType: 'HOTEL_OWNER' });
+				expect((await mutation('invalid')).errors).toBeDefined();
+				expect(spy).not.toHaveBeenCalled();
+				expect((await mutation()).errors).toBeUndefined();
+				expect(spy).toHaveBeenCalledWith(
+					...(action === 'cancelBooking' ? [memberId, 'HOTEL_OWNER', bookingId] : [memberId, bookingId]),
+				);
+			} finally {
+				spy.mockRestore();
+			}
+		},
+	);
 	const list = (input: unknown = {}, signedIn = true) =>
 		run(
 			'query($input:BookingsInquiry!){getMyBookings(input:$input){list{_id} metaCounter{total}}}',

@@ -10,6 +10,7 @@ import { RoomService } from '../../src/components/room/room.service';
 import { BookingService } from '../../src/components/booking/booking.service';
 import { MemberService } from '../../src/components/member/member.service';
 import { RoomSort } from '../../src/libs/enums/room.enum';
+import { MemberType } from '../../src/libs/enums/member.enum';
 import { getStayDates } from '../../src/libs/booking/stay-dates';
 
 // Opt-in: starts an isolated real MongoDB replica set; never reads the application .env.
@@ -235,4 +236,73 @@ integration('Booking transactions against real MongoDB', () => {
 		await hotels.updateOne({ _id: hotelId }, { $set: { hotelStatus: 'PAUSED' } });
 		await expect(bookingService.createBooking(guestId, input())).rejects.toMatchObject({ status: 404 });
 	});
+	it('confirms a held booking at a paused hotel without changing its price', async () => {
+		const booking = await bookingService.createBooking(guestId, input());
+		await hotels.updateOne({ _id: hotelId }, { $set: { hotelStatus: 'PAUSED' } });
+		const confirmed = await bookingService.confirmBooking(ownerId, booking._id);
+		expect(confirmed.bookingStatus).toBe('CONFIRMED');
+		expect(confirmed.expiresAt).toBeUndefined();
+		expect(confirmed.totalPrice).toBe(59.97);
+		await expect(bookingService.confirmBooking(ownerId, booking._id)).rejects.toMatchObject({ status: 409 });
+	});
+	it('rejects another owner and never revives an expired hold after inventory is rebooked', async () => {
+		const booking = await bookingService.createBooking(guestId, input({ rooms: 2, guests: 4 }));
+		await expect(bookingService.confirmBooking(new Types.ObjectId(), booking._id)).rejects.toMatchObject({
+			status: 404,
+		});
+		await bookings.updateOne({ _id: booking._id }, { $set: { expiresAt: new Date(Date.now() - 1) } });
+		await bookingService.createBooking(new Types.ObjectId(), input({ rooms: 2, guests: 4 }));
+		await expect(bookingService.confirmBooking(ownerId, booking._id)).rejects.toMatchObject({ status: 409 });
+		expect((await bookings.findById(booking._id))!.bookingStatus).toBe('PENDING');
+	});
+	it('lets the member cancel and releases inventory while preserving history', async () => {
+		const booking = await bookingService.createBooking(guestId, input({ rooms: 2, guests: 4 }));
+		await expect(
+			bookingService.cancelBooking(new Types.ObjectId(), MemberType.USER, booking._id),
+		).rejects.toMatchObject({ status: 404 });
+		await expect(
+			bookingService.cancelBooking(new Types.ObjectId(), MemberType.HOTEL_OWNER, booking._id),
+		).rejects.toMatchObject({ status: 404 });
+		const cancelled = await bookingService.cancelBooking(guestId, MemberType.USER, booking._id);
+		expect(cancelled.bookingStatus).toBe('CANCELLED');
+		expect((await available()).list[0].availableQuantity).toBe(2);
+		expect(await bookings.countDocuments()).toBe(1);
+		await expect(bookingService.confirmBooking(ownerId, booking._id)).rejects.toMatchObject({ status: 409 });
+		await expect(bookingService.cancelBooking(guestId, MemberType.USER, booking._id)).rejects.toMatchObject({
+			status: 409,
+		});
+	});
+	it('lets the hotel owner cancel a confirmed reservation', async () => {
+		const booking = await bookingService.createBooking(guestId, input());
+		await bookingService.confirmBooking(ownerId, booking._id);
+		expect((await bookingService.cancelBooking(ownerId, MemberType.HOTEL_OWNER, booking._id)).bookingStatus).toBe(
+			'CANCELLED',
+		);
+	});
+	it('does not complete a pending or future reservation', async () => {
+		const booking = await bookingService.createBooking(guestId, input());
+		await expect(bookingService.completeBooking(ownerId, booking._id)).rejects.toMatchObject({ status: 409 });
+		await bookingService.confirmBooking(ownerId, booking._id);
+		await expect(bookingService.completeBooking(ownerId, booking._id)).rejects.toMatchObject({ status: 409 });
+	});
+	it('completes only the owning hotel reservation and protects its terminal status', async () => {
+		const booking = await seed('2020-01-01', '2020-01-03', 1);
+		await expect(bookingService.completeBooking(new Types.ObjectId(), booking._id)).rejects.toMatchObject({
+			status: 404,
+		});
+		expect((await bookingService.completeBooking(ownerId, booking._id)).bookingStatus).toBe('COMPLETED');
+		await expect(bookingService.cancelBooking(guestId, MemberType.USER, booking._id)).rejects.toMatchObject({
+			status: 409,
+		});
+		await expect(bookingService.completeBooking(ownerId, booking._id)).rejects.toMatchObject({ status: 409 });
+	});
+	it('never overwrites cancellation when confirmation races with it', async () => {
+		const booking = await bookingService.createBooking(guestId, input());
+		const results = await Promise.allSettled([
+			bookingService.confirmBooking(ownerId, booking._id),
+			bookingService.cancelBooking(guestId, MemberType.USER, booking._id),
+		]);
+		expect(results[1].status).toBe('fulfilled');
+		expect((await bookings.findById(booking._id))!.bookingStatus).toBe('CANCELLED');
+	}, 30000);
 });

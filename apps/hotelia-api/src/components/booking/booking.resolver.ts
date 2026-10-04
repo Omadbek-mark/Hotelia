@@ -8,10 +8,43 @@ import { shapeIntoMongoObjectId } from '../../libs/config';
 import { AuthGuard } from '../auth/guards/auth.guard';
 import { AuthMember } from '../auth/decorators/authMember.decorator';
 import { BookingService } from './booking.service';
+import { MemberType } from '../../libs/enums/member.enum';
+import { Roles } from '../auth/decorators/roles.decorator';
+import { RolesGuard } from '../auth/guards/roles.guard';
 
 @Resolver(() => Booking)
 export class BookingResolver {
 	constructor(private readonly bookingService: BookingService) {}
+
+	@Roles(MemberType.HOTEL_OWNER)
+	@UseGuards(RolesGuard)
+	@Mutation(() => Booking)
+	public async confirmBooking(
+		@AuthMember('_id') memberId: Types.ObjectId,
+		@Args('bookingId') input: string,
+	): Promise<Booking> {
+		return await this.bookingService.confirmBooking(memberId, shapeIntoMongoObjectId(input));
+	}
+
+	@UseGuards(AuthGuard)
+	@Mutation(() => Booking)
+	public async cancelBooking(
+		@AuthMember('_id') memberId: Types.ObjectId,
+		@AuthMember('memberType') memberType: MemberType,
+		@Args('bookingId') input: string,
+	): Promise<Booking> {
+		return await this.bookingService.cancelBooking(memberId, memberType, shapeIntoMongoObjectId(input));
+	}
+
+	@Roles(MemberType.HOTEL_OWNER)
+	@UseGuards(RolesGuard)
+	@Mutation(() => Booking)
+	public async completeBooking(
+		@AuthMember('_id') memberId: Types.ObjectId,
+		@Args('bookingId') input: string,
+	): Promise<Booking> {
+		return await this.bookingService.completeBooking(memberId, shapeIntoMongoObjectId(input));
+	}
 
 	@UseGuards(AuthGuard)
 	@Mutation(() => Booking)
