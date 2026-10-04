@@ -7,6 +7,7 @@ import {
 	IsEnum,
 	IsIn,
 	IsInt,
+	IsMongoId,
 	IsNumber,
 	IsObject,
 	IsString,
@@ -85,4 +86,17 @@ export class OwnerHotelsInquiry extends HotelsInquiry {
 	@IsIn([HotelStatus.ACTIVE, HotelStatus.PAUSED])
 	@Field(() => HotelStatus, { nullable: true })
 	hotelStatus?: HotelStatus;
+}
+
+@InputType()
+export class AllHotelsInquiry extends HotelsInquiry {
+	@ValidateIf((_, value) => value !== undefined)
+	@IsEnum(HotelStatus)
+	@Field(() => HotelStatus, { nullable: true })
+	hotelStatus?: HotelStatus;
+
+	@ValidateIf((_, value) => value !== undefined)
+	@IsMongoId()
+	@Field(() => String, { nullable: true })
+	ownerId?: string;
 }

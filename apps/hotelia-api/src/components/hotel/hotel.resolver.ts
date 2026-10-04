@@ -1,9 +1,9 @@
 import { UseGuards, ValidationPipe } from '@nestjs/common';
 import { Args, Mutation, Query, Resolver } from '@nestjs/graphql';
 import { Hotel, Hotels } from '../../libs/dto/hotel/hotel';
-import { HotelsInquiry, OwnerHotelsInquiry } from '../../libs/dto/hotel/hotel.inquiry';
+import { AllHotelsInquiry, HotelsInquiry, OwnerHotelsInquiry } from '../../libs/dto/hotel/hotel.inquiry';
 import { HotelInput } from '../../libs/dto/hotel/hotel.input';
-import { HotelUpdate } from '../../libs/dto/hotel/hotel.update';
+import { AdminHotelUpdate, HotelUpdate } from '../../libs/dto/hotel/hotel.update';
 import { shapeIntoMongoObjectId } from '../../libs/config';
 import { Types } from 'mongoose';
 import { MemberType } from '../../libs/enums/member.enum';
@@ -23,6 +23,33 @@ export class HotelResolver {
 		private readonly hotelService: HotelService,
 		private readonly likeService: LikeService,
 	) {}
+
+	@Roles(MemberType.ADMIN)
+	@UseGuards(RolesGuard)
+	@Query(() => Hotels)
+	public async getAllHotelsByAdmin(
+		@Args('input', new ValidationPipe({ transform: true, whitelist: true, forbidNonWhitelisted: true }))
+		input: AllHotelsInquiry,
+	): Promise<Hotels> {
+		return await this.hotelService.getAllHotelsByAdmin(input);
+	}
+
+	@Roles(MemberType.ADMIN)
+	@UseGuards(RolesGuard)
+	@Query(() => Hotel)
+	public async getHotelByAdmin(@Args('hotelId') input: string): Promise<Hotel> {
+		return await this.hotelService.getHotelByAdmin(shapeIntoMongoObjectId(input));
+	}
+
+	@Roles(MemberType.ADMIN)
+	@UseGuards(RolesGuard)
+	@Mutation(() => Hotel)
+	public async updateHotelByAdmin(
+		@Args('input', new ValidationPipe({ transform: true, whitelist: true, forbidNonWhitelisted: true }))
+		input: AdminHotelUpdate,
+	): Promise<Hotel> {
+		return await this.hotelService.updateHotelByAdmin(input);
+	}
 
 	@UseGuards(AuthGuard)
 	@Mutation(() => FavoriteResult)

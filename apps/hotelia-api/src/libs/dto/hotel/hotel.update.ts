@@ -16,6 +16,17 @@ import {
 import { HotelAmenity, HotelStatus, HotelType } from '../../enums/hotel.enum';
 
 @InputType()
+export class AdminHotelUpdate {
+	@IsMongoId()
+	@Field(() => String)
+	_id!: string;
+
+	@IsIn([HotelStatus.ACTIVE, HotelStatus.PAUSED])
+	@Field(() => HotelStatus)
+	hotelStatus!: HotelStatus;
+}
+
+@InputType()
 export class HotelUpdate {
 	@IsMongoId()
 	@Field(() => String)
