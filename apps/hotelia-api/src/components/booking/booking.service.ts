@@ -8,7 +8,8 @@ import { BookingStatus } from '../../libs/enums/booking.enum';
 import { shapeIntoMongoObjectId } from '../../libs/config';
 import { assertNotPastCheckIn, getStayDates, hotelToday } from '../../libs/booking/stay-dates';
 import { MemberType } from '../../libs/enums/member.enum';
-import { bookingPrice } from '../../libs/booking/money';
+import { BOOKING_CURRENCY, bookingPrice } from '../../libs/booking/money';
+import { OwnerDashboard } from '../../libs/dto/booking/owner-dashboard';
 import { PENDING_HOLD_MS } from '../../libs/booking/inventory';
 import { availableRoomsPipeline } from '../../libs/booking/availability-pipeline';
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
@@ -226,6 +227,44 @@ export class BookingService {
 			match.checkOut = { $gt: stay.checkIn };
 		}
 		return await this.getBookingList(match, input, ownerId);
+	}
+
+	public async getOwnerDashboard(ownerId: Types.ObjectId): Promise<OwnerDashboard> {
+		const [inventory, [bookings]] = await Promise.all([
+			this.hotelService.getOwnerInventoryCounts(ownerId),
+			this.bookingModel
+				.aggregate<{ totalBookings: number; totalRevenue: number }>([
+					...this.ownerBookingsPipeline(ownerId),
+					{
+						$group: {
+							_id: null,
+							totalBookings: { $sum: 1 },
+							totalRevenue: {
+								$sum: {
+									$cond: [
+										{
+											$and: [
+												{ $eq: ['$bookingStatus', BookingStatus.COMPLETED] },
+												{ $eq: ['$currency', BOOKING_CURRENCY] },
+											],
+										},
+										{ $toDecimal: '$totalPrice' },
+										0,
+									],
+								},
+							},
+						},
+					},
+					{ $project: { _id: 0, totalBookings: 1, totalRevenue: { $toDouble: { $round: ['$totalRevenue', 2] } } } },
+				])
+				.exec(),
+		]);
+		return {
+			...inventory,
+			totalBookings: bookings?.totalBookings ?? 0,
+			totalRevenue: bookings?.totalRevenue ?? 0,
+			currency: BOOKING_CURRENCY,
+		};
 	}
 
 	public async getMyBookings(memberId: Types.ObjectId, input: BookingsInquiry): Promise<Bookings> {

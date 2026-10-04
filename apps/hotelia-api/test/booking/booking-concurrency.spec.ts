@@ -311,6 +311,47 @@ integration('Booking transactions against real MongoDB', () => {
 		rating,
 		commentContent: 'Enjoyed my stay',
 	});
+	it('computes the owner dashboard with physical quantities and completed USD booking values only', async () => {
+		const originalHotel = (await hotels.findById(hotelId))!.toObject();
+		const originalRoom = (await rooms.findById(roomId))!.toObject();
+		const paused = await hotels.create({ ...originalHotel, _id: new Types.ObjectId(), hotelStatus: 'PAUSED' });
+		await rooms.create({
+			...originalRoom,
+			_id: new Types.ObjectId(),
+			hotelId: paused._id,
+			roomStatus: 'PAUSED',
+			roomQuantity: 3,
+		});
+		await rooms.create({ ...originalRoom, _id: new Types.ObjectId(), roomStatus: 'DELETE', roomQuantity: 7 });
+		const deleted = await hotels.create({ ...originalHotel, _id: new Types.ObjectId(), hotelStatus: 'DELETE' });
+		await rooms.create({ ...originalRoom, _id: new Types.ObjectId(), hotelId: deleted._id, roomQuantity: 10 });
+		const foreign = await hotels.create({ ...originalHotel, _id: new Types.ObjectId(), ownerId: new Types.ObjectId() });
+		for (const [bookingStatus, totalPrice] of [
+			['COMPLETED', 19.99],
+			['COMPLETED', 0.01],
+			['CONFIRMED', 88],
+			['PENDING', 22],
+			['CANCELLED', 44],
+		]) {
+			await seed('2020-01-01', '2020-01-03', 1, { bookingStatus, totalPrice });
+		}
+		await seed('2020-01-01', '2020-01-03', 1, { hotelId: deleted._id, bookingStatus: 'COMPLETED', totalPrice: 10 });
+		await seed('2020-01-01', '2020-01-03', 1, { hotelId: foreign._id, bookingStatus: 'COMPLETED', totalPrice: 999 });
+		expect(await bookingService.getOwnerDashboard(ownerId)).toEqual({
+			totalHotels: 2,
+			totalRooms: 5,
+			totalBookings: 6,
+			totalRevenue: 30,
+			currency: 'USD',
+		});
+		expect(await bookingService.getOwnerDashboard(new Types.ObjectId())).toEqual({
+			totalHotels: 0,
+			totalRooms: 0,
+			totalBookings: 0,
+			totalRevenue: 0,
+			currency: 'USD',
+		});
+	});
 	it('requires the members own completed booking for the matching hotel', async () => {
 		const booking = await seed('2020-01-01', '2020-01-03', 1);
 		await expect(commentService.createComment(guestId as any, reviewInput(booking._id))).rejects.toMatchObject({
