@@ -19,6 +19,26 @@ import { Direction } from '../../enums/common.enum';
 import { availableCommentSorts } from '../../config';
 
 @InputType()
+export class OwnerReviewsInquiry {
+	@IsInt()
+	@Min(1)
+	@Max(1000000)
+	@Field(() => Int, { defaultValue: 1 })
+	page: number = 1;
+
+	@IsInt()
+	@Min(1)
+	@Max(100)
+	@Field(() => Int, { defaultValue: 20 })
+	limit: number = 20;
+
+	@ValidateIf((_, value) => value !== undefined)
+	@IsMongoId()
+	@Field(() => String, { nullable: true })
+	hotelId?: string;
+}
+
+@InputType()
 export class CommentInput {
 	@ValidateIf((input, value) => input.commentGroup === CommentGroup.HOTEL || value !== undefined)
 	@IsMongoId()

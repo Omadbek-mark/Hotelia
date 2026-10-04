@@ -129,6 +129,64 @@ integration('Booking transactions against real MongoDB', () => {
 		articleTitle: '[Seoul] guide',
 		articleContent: 'Useful travel advice',
 	};
+	it('owner reviews scope hotels before pagination and retain paused hotel history', async () => {
+		const foreign = await hotels.create({
+			...(await hotels.findById(hotelId))!.toObject(),
+			_id: new Types.ObjectId(),
+			ownerId: guestId,
+		});
+		await comments.create([
+			{
+				memberId: ownerId,
+				commentRefId: hotelId,
+				commentGroup: 'HOTEL',
+				rating: 5,
+				commentContent: 'First',
+				bookingId: new Types.ObjectId(),
+			},
+			{
+				memberId: ownerId,
+				commentRefId: hotelId,
+				commentGroup: 'HOTEL',
+				rating: 4,
+				commentContent: 'Second',
+				bookingId: new Types.ObjectId(),
+			},
+			{
+				memberId: ownerId,
+				commentRefId: hotelId,
+				commentGroup: 'HOTEL',
+				rating: 1,
+				commentContent: 'Deleted',
+				commentStatus: 'DELETE',
+				bookingId: new Types.ObjectId(),
+			},
+			{
+				memberId: ownerId,
+				commentRefId: foreign._id,
+				commentGroup: 'HOTEL',
+				rating: 3,
+				commentContent: 'Foreign',
+				bookingId: new Types.ObjectId(),
+			},
+		]);
+		await hotels.updateOne({ _id: hotelId }, { $set: { hotelStatus: 'PAUSED' } });
+		const result = await commentService.getOwnerReviews(ownerId as any, { page: 1, limit: 1 });
+		expect(result.metaCounter).toEqual([{ total: 2 }]);
+		expect(result.list).toHaveLength(1);
+		expect(String(result.list[0].commentRefId)).toBe(String(hotelId));
+		expect(result.list[0].memberData).not.toHaveProperty('memberPassword');
+		expect(result.list[0].memberData?.memberNick).toBe('owner');
+		const filtered = await commentService.getOwnerReviews(ownerId as any, {
+			page: 2,
+			limit: 1,
+			hotelId: String(hotelId),
+		});
+		expect(String(filtered.list[0]._id)).not.toBe(String(result.list[0]._id));
+		await expect(
+			commentService.getOwnerReviews(ownerId as any, { page: 1, limit: 20, hotelId: String(foreign._id) }),
+		).rejects.toMatchObject({ status: 404 });
+	});
 	it('hotel search uses available room prices and filters before pagination', async () => {
 		const second = await hotels.create({
 			...(await hotels.findById(hotelId))!.toObject(),

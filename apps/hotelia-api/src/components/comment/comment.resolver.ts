@@ -2,7 +2,7 @@ import { Args, Mutation, Query, Resolver } from '@nestjs/graphql';
 import { CommentService } from './comment.service';
 import { UseGuards, ValidationPipe } from '@nestjs/common';
 import { AuthGuard } from '../auth/guards/auth.guard';
-import { CommentInput, CommentsInquiry } from '../../libs/dto/comment/comment.input';
+import { CommentInput, CommentsInquiry, OwnerReviewsInquiry } from '../../libs/dto/comment/comment.input';
 import { AuthMember } from '../auth/decorators/authMember.decorator';
 import { Comment, Comments } from '../../libs/dto/comment/comment';
 import { CommentUpdate } from '../../libs/dto/comment/comment.update';
@@ -50,6 +50,17 @@ export class CommentResolver {
 		console.log('Query: getComments');
 		input.search.commentRefId = shapeIntoMongoObjectId(input.search.commentRefId);
 		return await this.commentService.getComments(memberId, input);
+	}
+
+	@Roles(MemberType.HOTEL_OWNER)
+	@UseGuards(RolesGuard)
+	@Query(() => Comments)
+	public async getOwnerReviews(
+		@Args('input', new ValidationPipe({ transform: true, whitelist: true, forbidNonWhitelisted: true }))
+		input: OwnerReviewsInquiry,
+		@AuthMember('_id') memberId: ObjectId,
+	): Promise<Comments> {
+		return await this.commentService.getOwnerReviews(memberId, input);
 	}
 
 	/** ADMIN **/

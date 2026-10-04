@@ -6,7 +6,7 @@ import {
 	NotFoundException,
 } from '@nestjs/common';
 import { InjectConnection, InjectModel } from '@nestjs/mongoose';
-import { ClientSession, Connection, Model, ObjectId } from 'mongoose';
+import { ClientSession, Connection, Model, ObjectId, PipelineStage } from 'mongoose';
 import { Booking } from '../../libs/dto/booking/booking';
 import { Hotel } from '../../libs/dto/hotel/hotel';
 import { BookingStatus } from '../../libs/enums/booking.enum';
@@ -14,7 +14,7 @@ import { HotelStatus } from '../../libs/enums/hotel.enum';
 import { MemberService } from '../member/member.service';
 import { PropertyService } from '../property/property.service';
 import { BoardArticleService } from '../board-article/board-article.service';
-import { CommentInput, CommentsInquiry } from '../../libs/dto/comment/comment.input';
+import { CommentInput, CommentsInquiry, OwnerReviewsInquiry } from '../../libs/dto/comment/comment.input';
 import { Direction, Message } from '../../libs/enums/common.enum';
 import { CommentGroup, CommentStatus } from '../../libs/enums/comment.enum';
 import { Comment, Comments } from '../../libs/dto/comment/comment';
@@ -176,9 +176,40 @@ export class CommentService {
 			_id: input?.direction ?? Direction.DESC,
 		};
 
+		return this.getCommentList([{ $match: match }, { $sort: sort }], input);
+	}
+
+	public async getOwnerReviews(memberId: ObjectId, input: OwnerReviewsInquiry): Promise<Comments> {
+		const match: T = { commentGroup: CommentGroup.HOTEL, commentStatus: CommentStatus.ACTIVE };
+		if (input.hotelId) {
+			const hotelId = shapeIntoMongoObjectId(input.hotelId);
+			if (!(await this.hotelModel.exists({ _id: hotelId, ownerId: memberId }).exec()))
+				throw new NotFoundException(Message.NO_DATA_FOUND);
+			match.commentRefId = hotelId;
+		}
+		return this.getCommentList(
+			[
+				{ $match: match },
+				{
+					$lookup: {
+						from: 'hotels',
+						localField: 'commentRefId',
+						foreignField: '_id',
+						as: 'ownerHotel',
+						pipeline: [{ $match: { ownerId: memberId } }, { $project: { _id: 1 } }],
+					},
+				},
+				{ $match: { 'ownerHotel.0': { $exists: true } } },
+				{ $unset: 'ownerHotel' },
+				{ $sort: { createdAt: -1, _id: -1 } },
+			],
+			input,
+		);
+	}
+
+	private async getCommentList(stages: PipelineStage[], input: { page: number; limit: number }): Promise<Comments> {
 		const result: Comments[] = await this.commentModel.aggregate([
-			{ $match: match },
-			{ $sort: sort },
+			...stages,
 			{
 				$facet: {
 					list: [
