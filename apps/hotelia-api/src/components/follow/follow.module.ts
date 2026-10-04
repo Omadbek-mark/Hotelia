@@ -7,21 +7,23 @@ import { LikeModule } from '../like/like.module';
 import { FollowResolver } from './follow.resolver';
 import { FollowService } from './follow.service';
 import { MemberModule } from '../member/member.module';
+import MemberSchema from '../../schemas/Member.model';
 
 @Module({
-  imports: [
-    MongooseModule.forFeature([
-      {
-        name: "Follow",
-        schema: FollowSchema
-      },
-    ]),
-    AuthModule,
-    ViewModule,
-    LikeModule,
-    MemberModule,
-  ],
-  providers: [FollowResolver, FollowService],
-  exports: [FollowService],
+	imports: [
+		MongooseModule.forFeature([
+			{ name: 'Member', schema: MemberSchema },
+			{
+				name: 'Follow',
+				schema: FollowSchema,
+			},
+		]),
+		AuthModule,
+		ViewModule,
+		LikeModule,
+		MemberModule,
+	],
+	providers: [FollowResolver, FollowService],
+	exports: [FollowService],
 })
 export class FollowModule {}

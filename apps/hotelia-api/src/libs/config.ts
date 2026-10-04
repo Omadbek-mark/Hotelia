@@ -121,6 +121,10 @@ export const lookupFollowingData = {
     localField: 'followingId',
     foreignField: '_id',
     as: 'followingData',
+    pipeline: [
+      { $match: { memberStatus: 'ACTIVE' } },
+      { $project: { _id: 1, memberNick: 1, memberImage: 1, memberDesc: 1 } },
+    ],
   },
 };
 
@@ -130,6 +134,10 @@ export const lookupFollowerData = {
     localField: 'followerId',
     foreignField: '_id',
     as: 'followerData',
+    pipeline: [
+      { $match: { memberStatus: 'ACTIVE' } },
+      { $project: { _id: 1, memberNick: 1, memberImage: 1, memberDesc: 1 } },
+    ],
   },
 };
 

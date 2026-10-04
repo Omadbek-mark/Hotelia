@@ -10,6 +10,8 @@ import { LikeService } from '../../src/components/like/like.service';
 import CommentSchema from '../../src/schemas/Comment.model';
 import { CommentService } from '../../src/components/comment/comment.service';
 import { CommentGroup, CommentStatus } from '../../src/libs/enums/comment.enum';
+import FollowSchema from '../../src/schemas/Follow.model';
+import { FollowService } from '../../src/components/follow/follow.service';
 import { HotelService } from '../../src/components/hotel/hotel.service';
 import { RoomService } from '../../src/components/room/room.service';
 import { BookingService } from '../../src/components/booking/booking.service';
@@ -27,6 +29,7 @@ integration('Booking transactions against real MongoDB', () => {
 	let hotels: Model<any>, rooms: Model<any>, bookings: Model<any>, members: Model<any>;
 	let likes: Model<any>, likeService: LikeService;
 	let comments: Model<any>, commentService: CommentService;
+	let follows: Model<any>, followService: FollowService;
 	let hotelService: HotelService, roomService: RoomService, bookingService: BookingService;
 	let hotelId: Types.ObjectId, roomId: Types.ObjectId, ownerId: Types.ObjectId;
 	const guestId = new Types.ObjectId();
@@ -42,10 +45,13 @@ integration('Booking transactions against real MongoDB', () => {
 		members = connection.model('Member', MemberSchema);
 		likes = connection.model('Like', LikeSchema);
 		comments = connection.model('Comment', CommentSchema);
+		follows = connection.model('Follow', FollowSchema);
+		await follows.init();
 		await comments.init();
 		await Promise.all([hotels.init(), rooms.init(), bookings.init(), members.init(), likes.init()]);
 		likeService = new LikeService(likes, hotels, connection);
 		const memberService = new MemberService(members, {} as any, {} as any, {} as any, {} as any);
+		followService = new FollowService(follows, memberService, members, connection);
 		commentService = new CommentService(comments, memberService, {} as any, {} as any, bookings, hotels, connection);
 		hotelService = new HotelService(connection, memberService, {} as any, hotels, bookings);
 		roomService = new RoomService(rooms, hotelService, connection, bookings);
@@ -56,6 +62,7 @@ integration('Booking transactions against real MongoDB', () => {
 		await repl?.stop();
 	});
 	beforeEach(async () => {
+		await follows.deleteMany({});
 		await comments.deleteMany({});
 		await Promise.all([
 			bookings.deleteMany({}),
@@ -108,6 +115,59 @@ integration('Booking transactions against real MongoDB', () => {
 		rooms: 1,
 		requestId: randomUUID(),
 		...change,
+	});
+	const followGuest = () =>
+		members.create({ _id: guestId, memberNick: 'guest', memberEmail: 'guest@test.invalid', memberPassword: 'private' });
+	it('keeps follow counters correct under duplicate requests and allows leaving a blocked target', async () => {
+		await followGuest();
+		await expect(followService.subscribe(guestId as any, guestId as any)).rejects.toMatchObject({ status: 400 });
+		const results = await Promise.allSettled([
+			followService.subscribe(guestId as any, ownerId as any),
+			followService.subscribe(guestId as any, ownerId as any),
+		]);
+		expect(results.filter((result) => result.status === 'fulfilled')).toHaveLength(1);
+		expect(await follows.countDocuments()).toBe(1);
+		expect((await members.findById(guestId))!.memberFollowings).toBe(1);
+		expect((await members.findById(ownerId))!.memberFollowers).toBe(1);
+		await members.updateOne({ _id: ownerId }, { $set: { memberStatus: 'BLOCK' } });
+		await followService.unsubscribe(guestId as any, ownerId as any);
+		await expect(followService.unsubscribe(guestId as any, ownerId as any)).rejects.toMatchObject({ status: 404 });
+		await expect(followService.subscribe(guestId as any, ownerId as any)).rejects.toMatchObject({ status: 404 });
+		expect((await members.findById(guestId))!.memberFollowings).toBe(0);
+		expect((await members.findById(ownerId))!.memberFollowers).toBe(0);
+	}, 30000);
+	it('rolls back follow creation when a member counter cannot be updated', async () => {
+		await expect(followService.subscribe(new Types.ObjectId() as any, ownerId as any)).rejects.toBeDefined();
+		expect(await follows.countDocuments()).toBe(0);
+		expect((await members.findById(ownerId))!.memberFollowers).toBe(0);
+	});
+	it('counts visible follow profiles before pagination and never returns private member fields', async () => {
+		await followGuest();
+		const hidden = await members.create({
+			memberNick: 'hidden',
+			memberEmail: 'hidden@test.invalid',
+			memberPassword: 'private',
+		});
+		await followService.subscribe(guestId as any, ownerId as any);
+		await followService.subscribe(guestId as any, hidden._id);
+		await members.updateOne({ _id: hidden._id }, { $set: { memberStatus: 'DELETE' } });
+		const list = await followService.getMemberFollowings(guestId as any, {
+			page: 1,
+			limit: 1,
+			search: { followerId: guestId as any },
+		});
+		expect(list.metaCounter).toEqual([{ total: 1 }]);
+		expect(list.list).toHaveLength(1);
+		expect(Object.keys(list.list[0].followingData!).sort()).toEqual(['_id', 'memberImage', 'memberNick']);
+		expect(list.list[0].meFollowed![0].myFollowing).toBe(true);
+		const followers = await followService.getMemberFollowers(null as any, {
+			page: 1,
+			limit: 10,
+			search: { followingId: ownerId as any },
+		});
+		expect(followers.metaCounter).toEqual([{ total: 1 }]);
+		expect(followers.list[0].followerData!.memberNick).toBe('guest');
+		expect(followers.list[0].meFollowed).toEqual([]);
 	});
 	it('saves a hotel only once under parallel retries and removes only the requesting member favorite', async () => {
 		await Promise.all([
