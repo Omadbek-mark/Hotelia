@@ -1,6 +1,6 @@
 import { Args, Mutation, Query, Resolver } from '@nestjs/graphql';
 import { CommentService } from './comment.service';
-import { UseGuards } from '@nestjs/common';
+import { UseGuards, ValidationPipe } from '@nestjs/common';
 import { AuthGuard } from '../auth/guards/auth.guard';
 import { CommentInput, CommentsInquiry } from '../../libs/dto/comment/comment.input';
 import { AuthMember } from '../auth/decorators/authMember.decorator';
@@ -20,7 +20,8 @@ export class CommentResolver {
 	@UseGuards(AuthGuard)
 	@Mutation(() => Comment)
 	public async createComment(
-		@Args('input') input: CommentInput,
+		@Args('input', new ValidationPipe({ transform: true, whitelist: true, forbidNonWhitelisted: true }))
+		input: CommentInput,
 		@AuthMember('_id') memberId: ObjectId,
 	): Promise<Comment> {
 		console.log('Mutation: createComment');
@@ -30,7 +31,8 @@ export class CommentResolver {
 	@UseGuards(AuthGuard)
 	@Mutation(() => Comment)
 	public async updateComment(
-		@Args('input') input: CommentUpdate,
+		@Args('input', new ValidationPipe({ transform: true, whitelist: true, forbidNonWhitelisted: true }))
+		input: CommentUpdate,
 		@AuthMember('_id') memberId: ObjectId,
 	): Promise<Comment> {
 		console.log('Mutation: updateComment');
@@ -41,7 +43,8 @@ export class CommentResolver {
 	@UseGuards(WithoutGuard)
 	@Query(() => Comments)
 	public async getComments(
-		@Args('input') input: CommentsInquiry,
+		@Args('input', new ValidationPipe({ transform: true, whitelist: true, forbidNonWhitelisted: true }))
+		input: CommentsInquiry,
 		@AuthMember('_id') memberId: ObjectId,
 	): Promise<Comments> {
 		console.log('Query: getComments');
