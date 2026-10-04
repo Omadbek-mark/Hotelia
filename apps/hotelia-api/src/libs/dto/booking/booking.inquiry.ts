@@ -41,3 +41,11 @@ export class OwnerBookingsInquiry extends BookingsInquiry {
 	@Field(() => String, { nullable: true })
 	checkOut?: string;
 }
+
+@InputType()
+export class AllBookingsInquiry extends OwnerBookingsInquiry {
+	@ValidateIf((_, value) => value !== undefined)
+	@IsMongoId()
+	@Field(() => String, { nullable: true })
+	memberId?: string;
+}

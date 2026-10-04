@@ -57,6 +57,47 @@ describe('Booking read API', () => {
 		});
 	const detail = (id = String(bookingId), signedIn = true) =>
 		run('query($id:String!){getBooking(bookingId:$id){_id memberId bookingStatus totalPrice}}', { id }, signedIn);
+	it('admin reads require ADMIN and apply validated filters without owner scope', async () => {
+		const list = 'query($input:AllBookingsInquiry!){getAllBookingsByAdmin(input:$input){list{_id} metaCounter{total}}}';
+		const detail = 'query($id:String!){getBookingByAdmin(bookingId:$id){_id}}';
+		expect((await run(list, { input: {} }, false)).errors).toBeDefined();
+		for (const memberType of ['USER', 'HOTEL_OWNER']) {
+			auth.verifyToken.mockResolvedValue({ _id: memberId, memberType });
+			expect((await run(list, { input: {} }, true)).errors).toBeDefined();
+			expect((await run(detail, { id: String(bookingId) }, true)).errors).toBeDefined();
+		}
+		expect(storage.aggregate).not.toHaveBeenCalled();
+		auth.verifyToken.mockResolvedValue({ _id: memberId, memberType: 'ADMIN' });
+		expect((await run(list, { input: { limit: 101 } }, true)).errors).toBeDefined();
+		expect((await run(detail, { id: 'invalid' }, true)).errors).toBeDefined();
+
+		expect((await run(list, { input: { checkIn: '2035-09-10' } }, true)).errors).toBeDefined();
+		expect(
+			(
+				await run(
+					list,
+					{
+						input: {
+							memberId: String(memberId),
+							bookingStatus: 'CANCELLED',
+							checkIn: '2035-09-10',
+							checkOut: '2035-09-12',
+						},
+					},
+					true,
+				)
+			).errors,
+		).toBeUndefined();
+		expect(storage.aggregate.mock.calls[0][0][0].$match).toEqual({
+			memberId,
+			bookingStatus: 'CANCELLED',
+			checkIn: { $lt: new Date('2035-09-12') },
+			checkOut: { $gt: new Date('2035-09-10') },
+		});
+		expect((await run(detail, { id: String(bookingId) }, true)).errors).toBeUndefined();
+		expect(storage.aggregate.mock.calls[1][0][0]).toEqual({ $match: { _id: bookingId } });
+	});
+
 	it('restricts the owner dashboard to the signed-in owner and returns zeros for an empty account', async () => {
 		const query = 'query{getOwnerDashboard{totalHotels totalRooms totalBookings totalRevenue currency}}';
 		expect((await run(query, {}, false)).errors).toBeDefined();

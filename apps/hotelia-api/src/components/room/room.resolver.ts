@@ -2,7 +2,7 @@ import { UseGuards, ValidationPipe } from '@nestjs/common';
 import { Args, Mutation, Query, Resolver } from '@nestjs/graphql';
 import { Types } from 'mongoose';
 import { Room, Rooms } from '../../libs/dto/room/room';
-import { OwnerRoomsInquiry, RoomsInquiry } from '../../libs/dto/room/room.inquiry';
+import { OwnerRoomsInquiry, RoomsInquiry, AllRoomsInquiry } from '../../libs/dto/room/room.inquiry';
 import { RoomUpdate } from '../../libs/dto/room/room.update';
 import { shapeIntoMongoObjectId } from '../../libs/config';
 import { RoomInput } from '../../libs/dto/room/room.input';
@@ -16,6 +16,23 @@ import { AvailableRooms, AvailableRoomsInquiry } from '../../libs/dto/room/room.
 @Resolver(() => Room)
 export class RoomResolver {
 	constructor(private readonly roomService: RoomService) {}
+
+	@Roles(MemberType.ADMIN)
+	@UseGuards(RolesGuard)
+	@Query(() => Rooms)
+	public async getAllRoomsByAdmin(
+		@Args('input', new ValidationPipe({ transform: true, whitelist: true, forbidNonWhitelisted: true }))
+		input: AllRoomsInquiry,
+	): Promise<Rooms> {
+		return this.roomService.getAllRoomsByAdmin(input);
+	}
+
+	@Roles(MemberType.ADMIN)
+	@UseGuards(RolesGuard)
+	@Query(() => Room)
+	public async getRoomByAdmin(@Args('roomId') input: string): Promise<Room> {
+		return this.roomService.getRoomByAdmin(shapeIntoMongoObjectId(input));
+	}
 
 	@Query(() => AvailableRooms)
 	public async getAvailableRooms(

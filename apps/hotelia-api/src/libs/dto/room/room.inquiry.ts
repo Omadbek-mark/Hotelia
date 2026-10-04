@@ -1,4 +1,4 @@
-import { Field, InputType, Int } from '@nestjs/graphql';
+import { Field, InputType, Int, OmitType } from '@nestjs/graphql';
 import { IsEnum, IsIn, IsInt, IsMongoId, Max, Min, ValidateIf } from 'class-validator';
 import { RoomSort, RoomStatus, RoomType } from '../../enums/room.enum';
 
@@ -34,6 +34,19 @@ export class RoomsInquiry {
 export class OwnerRoomsInquiry extends RoomsInquiry {
 	@ValidateIf((_, value) => value !== undefined)
 	@IsIn([RoomStatus.ACTIVE, RoomStatus.PAUSED])
+	@Field(() => RoomStatus, { nullable: true })
+	roomStatus?: RoomStatus;
+}
+
+@InputType()
+export class AllRoomsInquiry extends OmitType(RoomsInquiry, ['hotelId'] as const) {
+	@ValidateIf((_, value) => value !== undefined)
+	@IsMongoId()
+	@Field(() => String, { nullable: true })
+	hotelId?: string;
+
+	@ValidateIf((_, value) => value !== undefined)
+	@IsEnum(RoomStatus)
 	@Field(() => RoomStatus, { nullable: true })
 	roomStatus?: RoomStatus;
 }

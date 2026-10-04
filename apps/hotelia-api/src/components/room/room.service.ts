@@ -7,7 +7,7 @@ import { BadRequestException, ConflictException, Injectable, NotFoundException }
 import { InjectConnection, InjectModel } from '@nestjs/mongoose';
 import { Error as MongooseError, Connection, FilterQuery, Model, Types } from 'mongoose';
 import { Room, Rooms } from '../../libs/dto/room/room';
-import { OwnerRoomsInquiry, RoomsInquiry } from '../../libs/dto/room/room.inquiry';
+import { OwnerRoomsInquiry, RoomsInquiry, AllRoomsInquiry } from '../../libs/dto/room/room.inquiry';
 import { RoomUpdate } from '../../libs/dto/room/room.update';
 import { RoomInput } from '../../libs/dto/room/room.input';
 import { shapeIntoMongoObjectId } from '../../libs/config';
@@ -23,6 +23,19 @@ export class RoomService {
 		@InjectConnection() private readonly connection: Connection,
 		@InjectModel('Booking') private readonly bookingModel: Model<Booking>,
 	) {}
+
+	public async getAllRoomsByAdmin(input: AllRoomsInquiry): Promise<Rooms> {
+		const match: FilterQuery<Room> = {};
+		if (input.hotelId !== undefined) match.hotelId = shapeIntoMongoObjectId(input.hotelId);
+		if (input.roomStatus !== undefined) match.roomStatus = input.roomStatus;
+		return this.getRoomList(match, input);
+	}
+
+	public async getRoomByAdmin(roomId: Types.ObjectId): Promise<Room> {
+		const room = await this.roomModel.findOne({ _id: roomId }).lean().exec();
+		if (!room) throw new NotFoundException(Message.NO_DATA_FOUND);
+		return room;
+	}
 
 	public async getAvailableRooms(input: AvailableRoomsInquiry): Promise<AvailableRooms> {
 		const hotelId = shapeIntoMongoObjectId(input.hotelId);
@@ -54,7 +67,7 @@ export class RoomService {
 		return await this.getRoomList(match, input);
 	}
 
-	private async getRoomList(match: FilterQuery<Room>, input: RoomsInquiry): Promise<Rooms> {
+	private async getRoomList(match: FilterQuery<Room>, input: Omit<RoomsInquiry, 'hotelId'>): Promise<Rooms> {
 		if (input.roomType) match.roomType = input.roomType;
 		const sorts: Record<RoomSort, Record<string, 1 | -1>> = {
 			[RoomSort.NEWEST]: { createdAt: -1, _id: -1 },
