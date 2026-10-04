@@ -6,6 +6,9 @@ import { TotalCounter } from '../member/member';
 
 @ObjectType()
 export class Hotel {
+	@Field(() => Float, { nullable: true })
+	startingPrice?: number | null;
+
 	@Field(() => Boolean, { nullable: true })
 	isFavorite?: boolean;
 
