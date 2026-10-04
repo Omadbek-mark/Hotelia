@@ -2,9 +2,20 @@ import { Field, Float, Int, ObjectType } from '@nestjs/graphql';
 import type { Types } from 'mongoose';
 import { TotalCounter } from '../member/member';
 import { BookingStatus } from '../../enums/booking.enum';
+import { MemberPublic } from '../member/member-public';
+import { BookingHotelData, BookingRoomData } from './booking-data';
 
 @ObjectType()
 export class Booking {
+	@Field(() => BookingHotelData, { nullable: true })
+	hotelData?: BookingHotelData | null;
+
+	@Field(() => BookingRoomData, { nullable: true })
+	roomData?: BookingRoomData | null;
+
+	@Field(() => MemberPublic, { nullable: true })
+	memberData?: MemberPublic | null;
+
 	@Field(() => String)
 	currency!: string;
 

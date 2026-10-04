@@ -11,6 +11,7 @@ import { BookingService } from '../../src/components/booking/booking.service';
 import { MemberService } from '../../src/components/member/member.service';
 import { RoomSort } from '../../src/libs/enums/room.enum';
 import { MemberType } from '../../src/libs/enums/member.enum';
+import { BookingStatus } from '../../src/libs/enums/booking.enum';
 import { getStayDates } from '../../src/libs/booking/stay-dates';
 
 // Opt-in: starts an isolated real MongoDB replica set; never reads the application .env.
@@ -305,4 +306,91 @@ integration('Booking transactions against real MongoDB', () => {
 		expect(results[1].status).toBe('fulfilled');
 		expect((await bookings.findById(booking._id))!.bookingStatus).toBe('CANCELLED');
 	}, 30000);
+	it('scopes owner lists and totals before pagination, including filters and stable ordering', async () => {
+		const createdAt = new Date('2035-01-01T00:00:00Z');
+		await seed('2035-09-10', '2035-09-12', 1, { createdAt });
+		await seed('2035-09-11', '2035-09-13', 1, { createdAt });
+		await seed('2035-09-15', '2035-09-17', 1, { createdAt, bookingStatus: 'CANCELLED' });
+		const foreignHotel = await hotels.create({
+			...(await hotels.findById(hotelId))!.toObject(),
+			_id: new Types.ObjectId(),
+			ownerId: new Types.ObjectId(),
+		});
+		const foreignRoom = await rooms.create({
+			...(await rooms.findById(roomId))!.toObject(),
+			_id: new Types.ObjectId(),
+			hotelId: foreignHotel._id,
+		});
+		const foreignBooking = await seed('2035-09-10', '2035-09-12', 1, {
+			hotelId: foreignHotel._id,
+			roomId: foreignRoom._id,
+			createdAt,
+		});
+		const first = await bookingService.getOwnerBookings(ownerId, { page: 1, limit: 1 });
+		const second = await bookingService.getOwnerBookings(ownerId, { page: 2, limit: 1 });
+		expect(first.metaCounter).toEqual([{ total: 3 }]);
+		expect(second.metaCounter).toEqual([{ total: 3 }]);
+		expect(first.list).toHaveLength(1);
+		expect(String(first.list[0]._id)).not.toBe(String(second.list[0]._id));
+		expect(String(first.list[0].hotelId)).toBe(String(hotelId));
+		const filtered = await bookingService.getOwnerBookings(ownerId, {
+			page: 1,
+			limit: 20,
+			hotelId: String(hotelId),
+			bookingStatus: BookingStatus.CONFIRMED,
+			checkIn: '2035-09-12',
+			checkOut: '2035-09-14',
+		});
+		expect(filtered.metaCounter).toEqual([{ total: 1 }]);
+		expect(filtered.list[0].checkIn.toISOString().slice(0, 10)).toBe('2035-09-11');
+		expect(
+			await bookingService.getOwnerBookings(ownerId, { page: 1, limit: 20, hotelId: String(foreignHotel._id) }),
+		).toEqual({ list: [], metaCounter: [] });
+		await expect(bookingService.getOwnerBooking(ownerId, foreignBooking._id)).rejects.toMatchObject({ status: 404 });
+		expect((await bookingService.getOwnerBookings(new Types.ObjectId(), { page: 1, limit: 20 })).metaCounter).toEqual(
+			[],
+		);
+	});
+	it('returns projected guest and hotel/room data without leaking credentials or changing booking prices', async () => {
+		await members.create({
+			_id: guestId,
+			memberNick: 'guest',
+			memberEmail: 'guest@test.invalid',
+			memberPassword: 'private-hash',
+			memberPhone: '01012345678',
+		});
+		const booking = await bookingService.createBooking(guestId, input());
+		await roomService.updateRoom(ownerId, { _id: String(roomId), roomPrice: 30 });
+		const ownerDetail = await bookingService.getOwnerBooking(ownerId, booking._id);
+		expect(ownerDetail.hotelData!.hotelName).toBe('Test Hotel');
+		expect(ownerDetail.roomData!.roomName).toBe('Deluxe Room');
+		expect(Object.keys(ownerDetail.memberData!).sort()).toEqual(['_id', 'memberImage', 'memberNick']);
+		expect(ownerDetail.memberData!.memberNick).toBe('guest');
+		expect(ownerDetail.pricePerNight).toBe(19.99);
+		expect(ownerDetail.totalPrice).toBe(59.97);
+		const memberDetail = await bookingService.getBooking(guestId, booking._id);
+		expect(memberDetail.hotelData).toEqual(ownerDetail.hotelData);
+		const list = await bookingService.getMyBookings(guestId, { page: 1, limit: 20 });
+		expect(list.list[0].roomData).toEqual(ownerDetail.roomData);
+		await expect(bookingService.getBooking(ownerId, booking._id)).rejects.toMatchObject({ status: 404 });
+	});
+	it('preserves owner history for soft-deleted hotels and member history when related documents are absent', async () => {
+		const booking = await bookingService.createBooking(guestId, input());
+		await bookingService.cancelBooking(guestId, MemberType.USER, booking._id);
+		await roomService.deleteRoom(ownerId, roomId);
+		await hotelService.deleteHotel(ownerId, hotelId);
+		expect((await bookingService.getOwnerBooking(ownerId, booking._id)).hotelData!.hotelName).toBe('Test Hotel');
+		expect((await bookingService.getOwnerBookings(ownerId, { page: 1, limit: 20 })).metaCounter).toEqual([
+			{ total: 1 },
+		]);
+		// Only this isolated test database: simulate missing referenced documents.
+		await hotels.deleteOne({ _id: hotelId });
+		await rooms.deleteOne({ _id: roomId });
+		const detail = await bookingService.getBooking(guestId, booking._id);
+		expect(detail.hotelData).toBeUndefined();
+		expect(detail.roomData).toBeUndefined();
+		expect(detail.memberData).toBeUndefined();
+		expect(detail.bookingStatus).toBe('CANCELLED');
+		expect((await bookingService.getMyBookings(guestId, { page: 1, limit: 20 })).metaCounter).toEqual([{ total: 1 }]);
+	});
 });

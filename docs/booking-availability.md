@@ -6,7 +6,17 @@
 - `confirmBooking(bookingId)` and `completeBooking(bookingId)` require HOTEL_OWNER role and ownership of the booking's hotel.
 - `cancelBooking(bookingId)` requires authentication and permits the booking member or that hotel's owner. ADMIN does not bypass ownership.
 - `getBooking(bookingId)` and `getMyBookings(input)` require authentication and return only the requesting member's bookings. Hotel owners and admins do not gain access to other members' reservations through these queries.
+- `getOwnerBooking(bookingId)` and `getOwnerBookings(input: OwnerBookingsInquiry!)` require HOTEL_OWNER role. They return reservations only for hotels currently owned by that member, including PAUSED and soft-deleted hotels for historical visibility. Missing/foreign detail returns NotFound; a foreign hotel filter returns an empty list.
 - `getAvailableRooms(input)` is public and read-only. It is an estimate at query time, not an inventory hold.
+
+## Owner booking filters and related data
+
+- Owner inquiry inherits `page` (default 1, max 1000000), `limit` (default 20, max 100), and optional `bookingStatus`. Optional `hotelId` narrows the owner's own hotels; client-supplied `ownerId`/`memberId` are rejected.
+- Optional `checkIn` and `checkOut` must be supplied together as valid `YYYY-MM-DD` dates, with a range of 1–365 nights. They select bookings overlapping the range (`booking.checkIn < filter.checkOut` AND `booking.checkOut > filter.checkIn`). Adjacent stays are excluded. Historical dates are allowed.
+- Ownership and all filters apply before pagination and counting. Ordering is `createdAt DESC, _id DESC`. An empty result has `list: []` and `metaCounter: []`, consistent with existing APIs. PENDING includes expired records; clients must also inspect `expiresAt`.
+- All four booking read queries include nullable `hotelData`, `roomData`, and `memberData` through `$lookup`. Member data refers to the booking guest, not the hotel owner, and includes only `_id`, `memberNick`, `memberImage`, and `memberDesc`. MongoDB explicitly projects these fields because aggregation does not apply Mongoose `select: false`.
+- Hotel and room data contain display fields only. These are current names/images/location, not historical snapshots; financial values remain the immutable fields on Booking. Missing related documents do not remove a member's booking from the result. Owner reads require the Hotel document to establish ownership.
+- These related fields are populated by read queries. Mutation responses contain the booking itself; request a detail query afterward when related display data is needed.
 
 ## Dates and inventory
 
