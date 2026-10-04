@@ -98,6 +98,29 @@ describe('Room GraphQL API', () => {
 				},
 			},
 		);
+	it('admin reads require ADMIN and apply validated filters without owner scope', async () => {
+		const list = 'query($input:AllRoomsInquiry!){getAllRoomsByAdmin(input:$input){list{_id} metaCounter{total}}}';
+		const detail = 'query($id:String!){getRoomByAdmin(roomId:$id){_id}}';
+		expect((await run(list, { input: {} }, false)).errors).toBeDefined();
+		for (const memberType of ['USER', 'HOTEL_OWNER']) {
+			auth.verifyToken.mockResolvedValue({ _id: memberId, memberType });
+			expect((await run(list, { input: {} }, true)).errors).toBeDefined();
+			expect((await run(detail, { id: String(roomId) }, true)).errors).toBeDefined();
+		}
+		expect(storage.aggregate).not.toHaveBeenCalled();
+		auth.verifyToken.mockResolvedValue({ _id: memberId, memberType: 'ADMIN' });
+		expect((await run(list, { input: { limit: 101 } }, true)).errors).toBeDefined();
+		expect((await run(detail, { id: 'invalid' }, true)).errors).toBeDefined();
+
+		expect(
+			(await run(list, { input: { hotelId: String(hotelId), roomStatus: 'DELETE', roomType: 'DELUXE' } }, true)).errors,
+		).toBeUndefined();
+		expect(storage.aggregate.mock.calls[0][0][0].$match).toEqual({ hotelId, roomStatus: 'DELETE', roomType: 'DELUXE' });
+		expect((await run(detail, { id: String(roomId) }, true)).errors).toBeUndefined();
+		expect(storage.findOne).toHaveBeenCalledWith({ _id: roomId });
+		expect(hotels.getOwnerHotel).not.toHaveBeenCalled();
+	});
+
 	it('builds checkout-exclusive availability and paginates after inventory filtering', async () => {
 		expect((await available()).errors).toBeUndefined();
 		expect(hotels.getHotel).toHaveBeenCalledWith(hotelId);

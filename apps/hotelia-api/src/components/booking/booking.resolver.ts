@@ -3,7 +3,7 @@ import { UseGuards, ValidationPipe } from '@nestjs/common';
 import { Args, Mutation, Query, Resolver } from '@nestjs/graphql';
 import { Types } from 'mongoose';
 import { Booking, Bookings } from '../../libs/dto/booking/booking';
-import { BookingsInquiry, OwnerBookingsInquiry } from '../../libs/dto/booking/booking.inquiry';
+import { BookingsInquiry, OwnerBookingsInquiry, AllBookingsInquiry } from '../../libs/dto/booking/booking.inquiry';
 import { shapeIntoMongoObjectId } from '../../libs/config';
 import { AuthGuard } from '../auth/guards/auth.guard';
 import { AuthMember } from '../auth/decorators/authMember.decorator';
@@ -16,6 +16,23 @@ import { OwnerDashboard } from '../../libs/dto/booking/owner-dashboard';
 @Resolver(() => Booking)
 export class BookingResolver {
 	constructor(private readonly bookingService: BookingService) {}
+
+	@Roles(MemberType.ADMIN)
+	@UseGuards(RolesGuard)
+	@Query(() => Bookings)
+	public async getAllBookingsByAdmin(
+		@Args('input', new ValidationPipe({ transform: true, whitelist: true, forbidNonWhitelisted: true }))
+		input: AllBookingsInquiry,
+	): Promise<Bookings> {
+		return this.bookingService.getAllBookingsByAdmin(input);
+	}
+
+	@Roles(MemberType.ADMIN)
+	@UseGuards(RolesGuard)
+	@Query(() => Booking)
+	public async getBookingByAdmin(@Args('bookingId') input: string): Promise<Booking> {
+		return this.bookingService.getBookingByAdmin(shapeIntoMongoObjectId(input));
+	}
 
 	@Roles(MemberType.HOTEL_OWNER)
 	@UseGuards(RolesGuard)

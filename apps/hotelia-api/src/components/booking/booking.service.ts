@@ -16,7 +16,7 @@ import { BadRequestException, ConflictException, Injectable, NotFoundException }
 import { InjectConnection, InjectModel } from '@nestjs/mongoose';
 import { Connection, FilterQuery, Model, PipelineStage, Types } from 'mongoose';
 import { Booking, Bookings } from '../../libs/dto/booking/booking';
-import { BookingsInquiry, OwnerBookingsInquiry } from '../../libs/dto/booking/booking.inquiry';
+import { BookingsInquiry, OwnerBookingsInquiry, AllBookingsInquiry } from '../../libs/dto/booking/booking.inquiry';
 import { Message } from '../../libs/enums/common.enum';
 
 @Injectable()
@@ -214,6 +214,24 @@ export class BookingService {
 	}
 
 	public async getOwnerBookings(ownerId: Types.ObjectId, input: OwnerBookingsInquiry): Promise<Bookings> {
+		return this.getBookingList(this.bookingSearchMatch(input), input, ownerId);
+	}
+
+	public async getAllBookingsByAdmin(input: AllBookingsInquiry): Promise<Bookings> {
+		const match = this.bookingSearchMatch(input);
+		if (input.memberId !== undefined) match.memberId = shapeIntoMongoObjectId(input.memberId);
+		return this.getBookingList(match, input);
+	}
+
+	public async getBookingByAdmin(bookingId: Types.ObjectId): Promise<Booking> {
+		const [booking] = await this.bookingModel
+			.aggregate<Booking>([{ $match: { _id: bookingId } }, ...this.bookingDataPipeline()])
+			.exec();
+		if (!booking) throw new NotFoundException(Message.NO_DATA_FOUND);
+		return booking;
+	}
+
+	private bookingSearchMatch(input: OwnerBookingsInquiry): FilterQuery<Booking> {
 		const match: FilterQuery<Booking> = {};
 		if (input.hotelId !== undefined) match.hotelId = shapeIntoMongoObjectId(input.hotelId);
 		if (input.bookingStatus) match.bookingStatus = input.bookingStatus;
@@ -226,7 +244,7 @@ export class BookingService {
 			match.checkIn = { $lt: stay.checkOut };
 			match.checkOut = { $gt: stay.checkIn };
 		}
-		return await this.getBookingList(match, input, ownerId);
+		return match;
 	}
 
 	public async getOwnerDashboard(ownerId: Types.ObjectId): Promise<OwnerDashboard> {
