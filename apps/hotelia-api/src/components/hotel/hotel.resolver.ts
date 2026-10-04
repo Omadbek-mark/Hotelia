@@ -12,10 +12,45 @@ import { Roles } from '../auth/decorators/roles.decorator';
 import { WithoutGuard } from '../auth/guards/without.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { HotelService } from './hotel.service';
+import { LikeService } from '../like/like.service';
+import { AuthGuard } from '../auth/guards/auth.guard';
+import { FavoriteResult } from '../../libs/dto/like/favorite-result';
+import { FavoritesInquiry } from '../../libs/dto/like/favorites.inquiry';
 
 @Resolver(() => Hotel)
 export class HotelResolver {
-	constructor(private readonly hotelService: HotelService) {}
+	constructor(
+		private readonly hotelService: HotelService,
+		private readonly likeService: LikeService,
+	) {}
+
+	@UseGuards(AuthGuard)
+	@Mutation(() => FavoriteResult)
+	public async favoriteHotel(
+		@AuthMember('_id') memberId: Types.ObjectId,
+		@Args('hotelId') input: string,
+	): Promise<FavoriteResult> {
+		return await this.likeService.setHotelFavorite(memberId, shapeIntoMongoObjectId(input), true);
+	}
+
+	@UseGuards(AuthGuard)
+	@Mutation(() => FavoriteResult)
+	public async unfavoriteHotel(
+		@AuthMember('_id') memberId: Types.ObjectId,
+		@Args('hotelId') input: string,
+	): Promise<FavoriteResult> {
+		return await this.likeService.setHotelFavorite(memberId, shapeIntoMongoObjectId(input), false);
+	}
+
+	@UseGuards(AuthGuard)
+	@Query(() => Hotels)
+	public async getFavorites(
+		@AuthMember('_id') memberId: Types.ObjectId,
+		@Args('input', new ValidationPipe({ transform: true, whitelist: true, forbidNonWhitelisted: true }))
+		input: FavoritesInquiry,
+	): Promise<Hotels> {
+		return await this.likeService.getFavoriteHotels(memberId, input);
+	}
 
 	@Roles(MemberType.HOTEL_OWNER)
 	@UseGuards(RolesGuard)
@@ -51,12 +86,16 @@ export class HotelResolver {
 		return await this.hotelService.deleteHotel(memberId, hotelId);
 	}
 
+	@UseGuards(WithoutGuard)
 	@Query(() => Hotels)
 	public async getHotels(
 		@Args('input', new ValidationPipe({ transform: true, whitelist: true, forbidNonWhitelisted: true }))
 		input: HotelsInquiry,
+		@AuthMember('_id') memberId: Types.ObjectId | null,
 	): Promise<Hotels> {
-		return await this.hotelService.getHotels(input);
+		const result = await this.hotelService.getHotels(input);
+		await this.likeService.attachFavoriteStatus(result.list, memberId);
+		return result;
 	}
 
 	@Roles(MemberType.HOTEL_OWNER)
@@ -88,6 +127,8 @@ export class HotelResolver {
 		@AuthMember('_id') memberId: Types.ObjectId | null,
 	): Promise<Hotel> {
 		const hotelId = shapeIntoMongoObjectId(input);
-		return await this.hotelService.getHotel(hotelId, memberId);
+		const hotel = await this.hotelService.getHotel(hotelId, memberId);
+		await this.likeService.attachFavoriteStatus([hotel], memberId);
+		return hotel;
 	}
 }

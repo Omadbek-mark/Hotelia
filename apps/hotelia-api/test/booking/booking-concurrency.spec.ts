@@ -5,6 +5,8 @@ import HotelSchema from '../../src/schemas/Hotel.model';
 import RoomSchema from '../../src/schemas/Room.model';
 import BookingSchema from '../../src/schemas/Booking.model';
 import MemberSchema from '../../src/schemas/Member.model';
+import LikeSchema from '../../src/schemas/Like.model';
+import { LikeService } from '../../src/components/like/like.service';
 import { HotelService } from '../../src/components/hotel/hotel.service';
 import { RoomService } from '../../src/components/room/room.service';
 import { BookingService } from '../../src/components/booking/booking.service';
@@ -20,6 +22,7 @@ integration('Booking transactions against real MongoDB', () => {
 	let repl: MongoMemoryReplSet;
 	let connection: Connection;
 	let hotels: Model<any>, rooms: Model<any>, bookings: Model<any>, members: Model<any>;
+	let likes: Model<any>, likeService: LikeService;
 	let hotelService: HotelService, roomService: RoomService, bookingService: BookingService;
 	let hotelId: Types.ObjectId, roomId: Types.ObjectId, ownerId: Types.ObjectId;
 	const guestId = new Types.ObjectId();
@@ -33,7 +36,9 @@ integration('Booking transactions against real MongoDB', () => {
 		rooms = connection.model('Room', RoomSchema);
 		bookings = connection.model('Booking', BookingSchema);
 		members = connection.model('Member', MemberSchema);
-		await Promise.all([hotels.init(), rooms.init(), bookings.init(), members.init()]);
+		likes = connection.model('Like', LikeSchema);
+		await Promise.all([hotels.init(), rooms.init(), bookings.init(), members.init(), likes.init()]);
+		likeService = new LikeService(likes, hotels, connection);
 		const memberService = new MemberService(members, {} as any, {} as any, {} as any, {} as any);
 		hotelService = new HotelService(connection, memberService, {} as any, hotels, bookings);
 		roomService = new RoomService(rooms, hotelService, connection, bookings);
@@ -44,7 +49,13 @@ integration('Booking transactions against real MongoDB', () => {
 		await repl?.stop();
 	});
 	beforeEach(async () => {
-		await Promise.all([bookings.deleteMany({}), rooms.deleteMany({}), hotels.deleteMany({}), members.deleteMany({})]);
+		await Promise.all([
+			bookings.deleteMany({}),
+			rooms.deleteMany({}),
+			hotels.deleteMany({}),
+			members.deleteMany({}),
+			likes.deleteMany({}),
+		]);
 		const owner = await members.create({
 			memberNick: 'owner',
 			memberEmail: 'owner@test.invalid',
@@ -89,6 +100,70 @@ integration('Booking transactions against real MongoDB', () => {
 		rooms: 1,
 		requestId: randomUUID(),
 		...change,
+	});
+	it('saves a hotel only once under parallel retries and removes only the requesting member favorite', async () => {
+		await Promise.all([
+			likeService.setHotelFavorite(guestId, hotelId, true),
+			likeService.setHotelFavorite(guestId, hotelId, true),
+		]);
+		expect(await likes.countDocuments()).toBe(1);
+		expect((await hotels.findById(hotelId))!.hotelLikes).toBe(1);
+		const first = await likes.findOne();
+		expect(first.createdAt).toBeInstanceOf(Date);
+		await likeService.setHotelFavorite(guestId, hotelId, true);
+		expect((await likes.findOne())!.createdAt).toEqual(first.createdAt);
+		await likeService.setHotelFavorite(ownerId, hotelId, true);
+		await Promise.all([
+			likeService.setHotelFavorite(guestId, hotelId, false),
+			likeService.setHotelFavorite(guestId, hotelId, false),
+		]);
+		expect(await likes.countDocuments()).toBe(1);
+		expect((await hotels.findById(hotelId))!.hotelLikes).toBe(1);
+		expect((await likes.findOne())!.memberId.equals(ownerId)).toBe(true);
+	}, 30000);
+	it('keeps favorite counters consistent when save and remove race and rolls back failed writes', async () => {
+		await Promise.allSettled([
+			likeService.setHotelFavorite(guestId, hotelId, true),
+			likeService.setHotelFavorite(guestId, hotelId, false),
+		]);
+		expect((await hotels.findById(hotelId))!.hotelLikes).toBe(await likes.countDocuments());
+		const failure = jest.spyOn(hotels, 'findOneAndUpdate').mockImplementationOnce(() => {
+			throw new Error('counter write failed');
+		});
+		try {
+			await expect(likeService.setHotelFavorite(ownerId, hotelId, true)).rejects.toThrow('counter write failed');
+		} finally {
+			failure.mockRestore();
+		}
+		expect(await likes.countDocuments({ memberId: ownerId })).toBe(0);
+		expect((await hotels.findById(hotelId))!.hotelLikes).toBe(await likes.countDocuments());
+	});
+	it('filters favorites before counting, scopes members, and supplies personal flags', async () => {
+		await likeService.setHotelFavorite(guestId, hotelId, true);
+		const hidden = await hotels.create({
+			...(await hotels.findById(hotelId))!.toObject(),
+			_id: new Types.ObjectId(),
+			hotelLikes: 0,
+		});
+		await likeService.setHotelFavorite(guestId, hidden._id, true);
+		await hotels.updateOne({ _id: hidden._id }, { $set: { hotelStatus: 'PAUSED' } });
+		await likes.create({ memberId: guestId, likeRefId: new Types.ObjectId(), likeGroup: 'ARTICLE' });
+		const result = await likeService.getFavoriteHotels(guestId, { page: 1, limit: 1 });
+		expect(result.metaCounter).toEqual([{ total: 1 }]);
+		expect(result.list[0].isFavorite).toBe(true);
+		expect(result.list[0].memberData!.memberNick).toBe('owner');
+		expect((result.list[0].memberData as any).memberPassword).toBeUndefined();
+		expect(await likeService.getFavoriteHotels(ownerId, { page: 1, limit: 20 })).toEqual({ list: [], metaCounter: [] });
+		const list = [await hotels.findById(hotelId).lean()];
+		await likeService.attachFavoriteStatus(list, guestId);
+		expect(list[0].isFavorite).toBe(true);
+		await likeService.attachFavoriteStatus(list, ownerId);
+		expect(list[0].isFavorite).toBe(false);
+		await likeService.attachFavoriteStatus(list);
+		expect(list[0].isFavorite).toBe(false);
+		await expect(likeService.setHotelFavorite(guestId, hidden._id, true)).rejects.toMatchObject({ status: 404 });
+		await hotels.updateOne({ _id: hidden._id }, { $set: { hotelStatus: 'DELETE' } });
+		expect((await likeService.setHotelFavorite(guestId, hidden._id, false)).hotelLikes).toBe(0);
 	});
 	const available = (change: Record<string, unknown> = {}) =>
 		roomService.getAvailableRooms({

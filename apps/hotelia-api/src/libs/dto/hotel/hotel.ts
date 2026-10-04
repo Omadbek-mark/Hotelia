@@ -6,6 +6,9 @@ import { TotalCounter } from '../member/member';
 
 @ObjectType()
 export class Hotel {
+	@Field(() => Boolean, { nullable: true })
+	isFavorite?: boolean;
+
 	@Field(() => MemberPublic, { nullable: true })
 	memberData?: MemberPublic | null;
 

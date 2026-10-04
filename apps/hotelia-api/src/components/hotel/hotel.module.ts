@@ -7,6 +7,7 @@ import { MemberModule } from '../member/member.module';
 import { AuthModule } from '../auth/auth.module';
 import { HotelResolver } from './hotel.resolver';
 import { HotelService } from './hotel.service';
+import { LikeModule } from '../like/like.module';
 
 @Module({
 	imports: [
@@ -20,6 +21,7 @@ import { HotelService } from './hotel.service';
 		AuthModule,
 		MemberModule,
 		ViewModule,
+		LikeModule,
 	],
 	providers: [HotelResolver, HotelService],
 	exports: [HotelService],
