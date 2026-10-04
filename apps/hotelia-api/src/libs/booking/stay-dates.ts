@@ -25,7 +25,7 @@ export function getStayDates(checkIn: string, checkOut: string) {
 	return { checkIn: start, checkOut: end, nights };
 }
 
-export function assertNotPastCheckIn(checkIn: Date, timezone: string, now = new Date()): void {
+export function hotelToday(timezone: string, now = new Date()): Date {
 	const parts = new Intl.DateTimeFormat('en-US', {
 		timeZone: timezone,
 		year: 'numeric',
@@ -34,7 +34,11 @@ export function assertNotPastCheckIn(checkIn: Date, timezone: string, now = new 
 	}).formatToParts(now);
 	const part = (type: string) => parts.find((item) => item.type === type)!.value;
 	const today = `${part('year')}-${part('month')}-${part('day')}`;
-	if (checkIn.getTime() < parseStayDate(today).getTime()) {
+	return parseStayDate(today);
+}
+
+export function assertNotPastCheckIn(checkIn: Date, timezone: string, now = new Date()): void {
+	if (checkIn.getTime() < hotelToday(timezone, now).getTime()) {
 		throw new BadRequestException('Check-in cannot be before today in the hotel timezone');
 	}
 }

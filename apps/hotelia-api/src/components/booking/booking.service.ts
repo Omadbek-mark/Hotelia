@@ -6,7 +6,8 @@ import { HotelService } from '../hotel/hotel.service';
 import { RoomSort, RoomStatus } from '../../libs/enums/room.enum';
 import { BookingStatus } from '../../libs/enums/booking.enum';
 import { shapeIntoMongoObjectId } from '../../libs/config';
-import { assertNotPastCheckIn, getStayDates } from '../../libs/booking/stay-dates';
+import { assertNotPastCheckIn, getStayDates, hotelToday } from '../../libs/booking/stay-dates';
+import { MemberType } from '../../libs/enums/member.enum';
 import { bookingPrice } from '../../libs/booking/money';
 import { PENDING_HOLD_MS } from '../../libs/booking/inventory';
 import { availableRoomsPipeline } from '../../libs/booking/availability-pipeline';
@@ -119,6 +120,76 @@ export class BookingService {
 			throw new ConflictException('requestId was already used with different booking details');
 		}
 		return booking;
+	}
+
+	public async confirmBooking(ownerId: Types.ObjectId, bookingId: Types.ObjectId): Promise<Booking> {
+		const target = await this.bookingModel.findById(bookingId).lean().exec();
+		if (!target) throw new NotFoundException(Message.NO_DATA_FOUND);
+		return await this.connection.transaction(async (session) => {
+			// Share the hotel lock with new bookings and inventory changes before checking expiry.
+			const hotel = await this.hotelService.lockBookingHotel(target.hotelId, session, ownerId);
+			const now = new Date();
+			const result = await this.bookingModel
+				.findOneAndUpdate(
+					{
+						_id: bookingId,
+						bookingStatus: BookingStatus.PENDING,
+						checkIn: { $gte: hotelToday(hotel.hotelTimezone, now) },
+						$or: [{ expiresAt: { $gt: now } }, { expiresAt: null }],
+					},
+					{ $set: { bookingStatus: BookingStatus.CONFIRMED }, $unset: { expiresAt: 1 } },
+					{ new: true, runValidators: true, session },
+				)
+				.exec();
+			if (!result)
+				throw new ConflictException('Only an unexpired pending booking with a non-past check-in can be confirmed');
+			return result;
+		});
+	}
+
+	public async cancelBooking(
+		memberId: Types.ObjectId,
+		memberType: MemberType,
+		bookingId: Types.ObjectId,
+	): Promise<Booking> {
+		const booking = await this.bookingModel.findById(bookingId).lean().exec();
+		if (!booking) throw new NotFoundException(Message.NO_DATA_FOUND);
+		if (!booking.memberId.equals(memberId)) {
+			if (memberType !== MemberType.HOTEL_OWNER) throw new NotFoundException(Message.NO_DATA_FOUND);
+			await this.hotelService.getOwnerHotel(memberId, booking.hotelId);
+		}
+		// Cancellation only releases inventory. The atomic status filter prevents overwriting completion.
+		const result = await this.bookingModel
+			.findOneAndUpdate(
+				{ _id: bookingId, bookingStatus: { $in: [BookingStatus.PENDING, BookingStatus.CONFIRMED] } },
+				{ $set: { bookingStatus: BookingStatus.CANCELLED }, $unset: { expiresAt: 1 } },
+				{ new: true, runValidators: true },
+			)
+			.exec();
+		if (!result) throw new ConflictException('Only pending or confirmed bookings can be cancelled');
+		return result;
+	}
+
+	public async completeBooking(ownerId: Types.ObjectId, bookingId: Types.ObjectId): Promise<Booking> {
+		const target = await this.bookingModel.findById(bookingId).lean().exec();
+		if (!target) throw new NotFoundException(Message.NO_DATA_FOUND);
+		return await this.connection.transaction(async (session) => {
+			const hotel = await this.hotelService.lockBookingHotel(target.hotelId, session, ownerId);
+			const result = await this.bookingModel
+				.findOneAndUpdate(
+					{
+						_id: bookingId,
+						bookingStatus: BookingStatus.CONFIRMED,
+						checkOut: { $lte: hotelToday(hotel.hotelTimezone) },
+					},
+					{ $set: { bookingStatus: BookingStatus.COMPLETED } },
+					{ new: true, runValidators: true, session },
+				)
+				.exec();
+			if (!result)
+				throw new ConflictException('Only confirmed bookings whose check-out date has arrived can be completed');
+			return result;
+		});
 	}
 
 	public async getBooking(memberId: Types.ObjectId, bookingId: Types.ObjectId): Promise<Booking> {
