@@ -13,14 +13,61 @@ import {
 	IsString,
 	Max,
 	MaxLength,
+	Matches,
 	Min,
 	ValidateIf,
 	ValidateNested,
 } from 'class-validator';
 import { HotelAmenity, HotelSort, HotelStatus, HotelType } from '../../enums/hotel.enum';
+import { RoomType } from '../../enums/room.enum';
 
 @InputType()
 export class HotelSearch {
+	@ValidateIf((_, value) => value !== undefined)
+	@IsString()
+	@Matches(/^\d{4}-\d{2}-\d{2}$/)
+	@Field(() => String, { nullable: true })
+	checkIn?: string;
+
+	@ValidateIf((_, value) => value !== undefined)
+	@IsString()
+	@Matches(/^\d{4}-\d{2}-\d{2}$/)
+	@Field(() => String, { nullable: true })
+	checkOut?: string;
+
+	@ValidateIf((_, value) => value !== undefined)
+	@IsInt()
+	@Min(1)
+	@Max(2147483647)
+	@Field(() => Int, { nullable: true })
+	guests?: number;
+
+	@ValidateIf((_, value) => value !== undefined)
+	@IsInt()
+	@Min(1)
+	@Max(2147483647)
+	@Field(() => Int, { nullable: true })
+	rooms?: number;
+
+	@ValidateIf((_, value) => value !== undefined)
+	@IsNumber({ maxDecimalPlaces: 2 })
+	@Min(0)
+	@Max(Number.MAX_SAFE_INTEGER / 100)
+	@Field(() => Float, { nullable: true })
+	minPrice?: number;
+
+	@ValidateIf((_, value) => value !== undefined)
+	@IsNumber({ maxDecimalPlaces: 2 })
+	@Min(0)
+	@Max(Number.MAX_SAFE_INTEGER / 100)
+	@Field(() => Float, { nullable: true })
+	maxPrice?: number;
+
+	@ValidateIf((_, value) => value !== undefined)
+	@IsEnum(RoomType)
+	@Field(() => RoomType, { nullable: true })
+	roomType?: RoomType;
+
 	@ValidateIf((_, value) => value !== undefined)
 	@IsString()
 	@MaxLength(100)

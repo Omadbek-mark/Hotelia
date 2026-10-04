@@ -29,6 +29,8 @@ export enum HotelAmenity {
 registerEnumType(HotelAmenity, { name: 'HotelAmenity' });
 
 export enum HotelSort {
+	PRICE_ASC = 'PRICE_ASC',
+	PRICE_DESC = 'PRICE_DESC',
 	NEWEST = 'NEWEST',
 	RATING = 'RATING',
 	MOST_POPULAR = 'MOST_POPULAR',

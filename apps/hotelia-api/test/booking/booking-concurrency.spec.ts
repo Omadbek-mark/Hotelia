@@ -20,6 +20,7 @@ import { RoomService } from '../../src/components/room/room.service';
 import { BookingService } from '../../src/components/booking/booking.service';
 import { MemberService } from '../../src/components/member/member.service';
 import { RoomSort } from '../../src/libs/enums/room.enum';
+import { HotelSort } from '../../src/libs/enums/hotel.enum';
 import { MemberType } from '../../src/libs/enums/member.enum';
 import { BookingStatus } from '../../src/libs/enums/booking.enum';
 import { getStayDates } from '../../src/libs/booking/stay-dates';
@@ -128,6 +129,50 @@ integration('Booking transactions against real MongoDB', () => {
 		articleTitle: '[Seoul] guide',
 		articleContent: 'Useful travel advice',
 	};
+	it('hotel search uses available room prices and filters before pagination', async () => {
+		const second = await hotels.create({
+			...(await hotels.findById(hotelId))!.toObject(),
+			_id: new Types.ObjectId(),
+			hotelName: 'Second Hotel',
+		});
+		await rooms.create({
+			...(await rooms.findById(roomId))!.toObject(),
+			_id: new Types.ObjectId(),
+			hotelId: second._id,
+			roomPrice: 30,
+		});
+		const search = { checkIn: '2035-09-10', checkOut: '2035-09-13', guests: 4, rooms: 2 };
+		const query = { page: 1, limit: 1, sort: HotelSort.PRICE_ASC, search };
+		const first = await hotelService.getHotels(query);
+		expect(first.metaCounter).toEqual([{ total: 2 }]);
+		expect(first.list[0].startingPrice).toBe(19.99);
+		expect((await hotelService.getHotels({ ...query, sort: HotelSort.PRICE_DESC })).list[0].startingPrice).toBe(30);
+		await seed('2035-09-10', '2035-09-13', 2);
+		const booked = await hotelService.getHotels(query);
+		expect(booked.metaCounter).toEqual([{ total: 1 }]);
+		expect(String(booked.list[0]._id)).toBe(String(second._id));
+		expect((await hotelService.getHotels({ ...query, search: { ...search, maxPrice: 25 } })).list).toEqual([]);
+		expect((await hotelService.getHotels({ ...query, search: { ...search, guests: 5 } })).list).toEqual([]);
+		const adjacent = await hotelService.getHotels({
+			...query,
+			search: { ...search, checkIn: '2035-09-13', checkOut: '2035-09-15' },
+		});
+		expect(adjacent.metaCounter).toEqual([{ total: 2 }]);
+		expect(adjacent.list[0].startingPrice).toBe(19.99);
+	});
+	it('hotel search handles empty inventory and rejects invalid date or price ranges', async () => {
+		const query = { page: 1, limit: 20, sort: HotelSort.NEWEST };
+		for (const search of [
+			{ checkIn: '2035-09-10' },
+			{ checkIn: '2035-09-13', checkOut: '2035-09-10' },
+			{ minPrice: 30, maxPrice: 20 },
+		]) {
+			await expect(hotelService.getHotels({ ...query, search })).rejects.toMatchObject({ status: 400 });
+		}
+		await rooms.updateOne({ _id: roomId }, { $set: { roomStatus: 'PAUSED' } });
+		expect((await hotelService.getHotels(query)).list[0].startingPrice).toBeNull();
+		expect((await hotelService.getHotels({ ...query, search: { rooms: 1 } })).list).toEqual([]);
+	});
 	it('keeps article counts consistent and prevents editing another authors article or deleting twice', async () => {
 		const article = await articleService.createBoardArticle(ownerId as any, articleInput);
 		expect((await members.findById(ownerId))!.memberArticles).toBe(1);

@@ -1,10 +1,12 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectConnection, InjectModel } from '@nestjs/mongoose';
-import { Error as MongooseError, ClientSession, Connection, FilterQuery, Model, Types } from 'mongoose';
+import { Error as MongooseError, ClientSession, Connection, FilterQuery, Model, PipelineStage, Types } from 'mongoose';
 import { Booking } from '../../libs/dto/booking/booking';
 import { inventoryBookingFilter } from '../../libs/booking/inventory';
 import { Hotel, Hotels } from '../../libs/dto/hotel/hotel';
-import { AllHotelsInquiry, HotelsInquiry, OwnerHotelsInquiry } from '../../libs/dto/hotel/hotel.inquiry';
+import { AllHotelsInquiry, HotelSearch, HotelsInquiry, OwnerHotelsInquiry } from '../../libs/dto/hotel/hotel.inquiry';
+import { getStayDates } from '../../libs/booking/stay-dates';
+import { roomInventoryPipeline } from '../../libs/booking/availability-pipeline';
 import { escapeSearchText } from '../../libs/search';
 import { MemberStatus, MemberType } from '../../libs/enums/member.enum';
 import { HotelInput } from '../../libs/dto/hotel/hotel.input';
@@ -228,7 +230,29 @@ export class HotelService {
 
 	private async getHotelList(match: FilterQuery<Hotel>, input: HotelsInquiry): Promise<Hotels> {
 		this.shapeMatchQuery(match, input);
+		const search = input.search ?? {};
+		let stay: ReturnType<typeof getStayDates> | undefined;
+		if (search.checkIn !== undefined || search.checkOut !== undefined) {
+			if (search.checkIn === undefined || search.checkOut === undefined)
+				throw new BadRequestException('Provide both checkIn and checkOut');
+			stay = getStayDates(search.checkIn, search.checkOut);
+		}
+		if (search.minPrice !== undefined && search.maxPrice !== undefined && search.minPrice > search.maxPrice) {
+			throw new BadRequestException('minPrice cannot exceed maxPrice');
+		}
+		const filterRooms =
+			!!stay ||
+			search.guests !== undefined ||
+			search.rooms !== undefined ||
+			search.roomType !== undefined ||
+			search.minPrice !== undefined ||
+			search.maxPrice !== undefined ||
+			[HotelSort.PRICE_ASC, HotelSort.PRICE_DESC].includes(input.sort);
+		const now = new Date();
+		const pricePipeline = this.hotelRoomPricePipeline(search, stay, now);
 		const sorts: Record<HotelSort, Record<string, 1 | -1>> = {
+			[HotelSort.PRICE_ASC]: { startingPrice: 1, _id: 1 },
+			[HotelSort.PRICE_DESC]: { startingPrice: -1, _id: -1 },
 			[HotelSort.NEWEST]: { createdAt: -1, _id: -1 },
 			[HotelSort.RATING]: { hotelRating: -1, _id: -1 },
 			[HotelSort.MOST_POPULAR]: { hotelViews: -1, _id: -1 },
@@ -236,6 +260,21 @@ export class HotelService {
 		const result = await this.hotelModel
 			.aggregate<Hotels>([
 				{ $match: match },
+				...(stay
+					? [
+							{
+								$match: {
+									$expr: {
+										$gte: [
+											search.checkIn,
+											{ $dateToString: { date: now, format: '%Y-%m-%d', timezone: '$hotelTimezone' } },
+										],
+									},
+								},
+							},
+						]
+					: []),
+				...(filterRooms ? [...pricePipeline, { $match: { startingPrice: { $ne: null } } }] : []),
 				{ $sort: sorts[input.sort] },
 				{
 					$facet: {
@@ -255,6 +294,7 @@ export class HotelService {
 								},
 							},
 							{ $unwind: { path: '$memberData', preserveNullAndEmptyArrays: true } },
+							...(!filterRooms ? pricePipeline : []),
 						],
 						metaCounter: [{ $count: 'total' }],
 					},
@@ -262,6 +302,45 @@ export class HotelService {
 			])
 			.exec();
 		return result[0] ?? { list: [], metaCounter: [] };
+	}
+
+	private hotelRoomPricePipeline(
+		search: HotelSearch,
+		stay: ReturnType<typeof getStayDates> | undefined,
+		now: Date,
+	): (PipelineStage.Lookup | PipelineStage.Set | PipelineStage.Unset)[] {
+		const rooms = search.rooms ?? 1;
+		const match: Record<string, unknown> = {
+			roomStatus: RoomStatus.ACTIVE,
+			roomQuantity: { $gte: rooms },
+			roomCapacity: { $gte: Math.ceil((search.guests ?? 1) / rooms) },
+		};
+		if (search.roomType) match.roomType = search.roomType;
+		if (search.minPrice !== undefined || search.maxPrice !== undefined) {
+			match.roomPrice = {
+				...(search.minPrice !== undefined ? { $gte: search.minPrice } : {}),
+				...(search.maxPrice !== undefined ? { $lte: search.maxPrice } : {}),
+			};
+		}
+		return [
+			{
+				$lookup: {
+					from: 'rooms',
+					localField: '_id',
+					foreignField: 'hotelId',
+					as: 'roomPriceData',
+					pipeline: [
+						{ $match: match },
+						...(stay ? roomInventoryPipeline({ rooms }, stay, now) : []),
+						{ $sort: { roomPrice: 1, _id: 1 } },
+						{ $limit: 1 },
+						{ $project: { _id: 0, roomPrice: 1 } },
+					],
+				},
+			},
+			{ $set: { startingPrice: { $ifNull: [{ $arrayElemAt: ['$roomPriceData.roomPrice', 0] }, null] } } },
+			{ $unset: 'roomPriceData' },
+		];
 	}
 
 	private shapeMatchQuery(match: FilterQuery<Hotel>, input: HotelsInquiry): void {
