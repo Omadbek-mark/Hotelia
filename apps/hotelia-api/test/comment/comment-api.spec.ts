@@ -15,6 +15,7 @@ describe('Hotel reviews through comment API', () => {
 		createComment: jest.fn(),
 		updateComment: jest.fn(),
 		getComments: jest.fn(),
+		getOwnerReviews: jest.fn(),
 		removeCommentByAdmin: jest.fn(),
 	};
 	const auth = { verifyToken: jest.fn() };
@@ -53,6 +54,18 @@ describe('Hotel reviews through comment API', () => {
 		rating: 5,
 		commentContent: 'Good stay',
 	};
+	it('restricts owner reviews to owners and validates pagination and hotel identity', async () => {
+		const source = 'query($input:OwnerReviewsInquiry!){getOwnerReviews(input:$input){list{_id} metaCounter{total}}}';
+		expect((await run(source, {}, false)).errors).toBeDefined();
+		expect((await run(source, {})).errors).toBeDefined();
+		auth.verifyToken.mockResolvedValue({ _id: id, memberType: 'HOTEL_OWNER' });
+		for (const input of [{ hotelId: 'bad' }, { limit: 101 }, { page: 0 }, { ownerId: String(id) }])
+			expect((await run(source, input)).errors).toBeDefined();
+		expect(service.getOwnerReviews).not.toHaveBeenCalled();
+		service.getOwnerReviews.mockResolvedValue({ list: [], metaCounter: [] });
+		expect((await run(source, {})).errors).toBeUndefined();
+		expect(service.getOwnerReviews).toHaveBeenCalledWith(id, expect.objectContaining({ page: 1, limit: 20 }));
+	});
 	const create = (input: unknown, signedIn = true) =>
 		run('mutation($input:CommentInput!){createComment(input:$input){_id rating}}', input, signedIn);
 	it('requires authentication and validates hotel review fields', async () => {
