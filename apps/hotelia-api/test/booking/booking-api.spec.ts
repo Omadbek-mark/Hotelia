@@ -16,6 +16,7 @@ describe('Booking read API', () => {
 	let app: INestApplication;
 	const storage = { findOne: jest.fn(), aggregate: jest.fn() };
 	const auth = { verifyToken: jest.fn() };
+	const hotels = { getOwnerInventoryCounts: jest.fn() };
 	beforeAll(async () => {
 		const module = await Test.createTestingModule({
 			imports: [GraphQLModule.forRoot({ driver: ApolloDriver, autoSchemaFile: true })],
@@ -25,7 +26,7 @@ describe('Booking read API', () => {
 				{ provide: getModelToken('Booking'), useValue: storage },
 				{ provide: getModelToken('Room'), useValue: {} },
 				{ provide: getConnectionToken(), useValue: {} },
-				{ provide: HotelService, useValue: {} },
+				{ provide: HotelService, useValue: hotels },
 				{ provide: AuthService, useValue: auth },
 			],
 		}).compile();
@@ -56,6 +57,30 @@ describe('Booking read API', () => {
 		});
 	const detail = (id = String(bookingId), signedIn = true) =>
 		run('query($id:String!){getBooking(bookingId:$id){_id memberId bookingStatus totalPrice}}', { id }, signedIn);
+	it('restricts the owner dashboard to the signed-in owner and returns zeros for an empty account', async () => {
+		const query = 'query{getOwnerDashboard{totalHotels totalRooms totalBookings totalRevenue currency}}';
+		expect((await run(query, {}, false)).errors).toBeDefined();
+		for (const memberType of ['USER', 'ADMIN']) {
+			auth.verifyToken.mockResolvedValue({ _id: memberId, memberType });
+			expect((await run(query, {})).errors).toBeDefined();
+		}
+		expect(hotels.getOwnerInventoryCounts).not.toHaveBeenCalled();
+		expect(storage.aggregate).not.toHaveBeenCalled();
+		auth.verifyToken.mockResolvedValue({ _id: memberId, memberType: 'HOTEL_OWNER' });
+		hotels.getOwnerInventoryCounts.mockResolvedValue({ totalHotels: 0, totalRooms: 0 });
+		storage.aggregate.mockReturnValue({ exec: async () => [] });
+		const result = await run(query, {});
+		expect(result.errors).toBeUndefined();
+		expect(result.data?.getOwnerDashboard).toEqual({
+			totalHotels: 0,
+			totalRooms: 0,
+			totalBookings: 0,
+			totalRevenue: 0,
+			currency: 'USD',
+		});
+		expect(hotels.getOwnerInventoryCounts).toHaveBeenCalledWith(memberId);
+		expect((await run('query{getOwnerDashboard(ownerId:"other"){totalHotels}}', {})).errors).toBeDefined();
+	});
 	it.each(['confirmBooking', 'cancelBooking', 'completeBooking'] as const)(
 		'%s validates identity, role and ObjectId before calling the service',
 		async (action) => {

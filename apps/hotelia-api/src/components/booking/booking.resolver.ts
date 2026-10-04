@@ -11,10 +11,18 @@ import { BookingService } from './booking.service';
 import { MemberType } from '../../libs/enums/member.enum';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { RolesGuard } from '../auth/guards/roles.guard';
+import { OwnerDashboard } from '../../libs/dto/booking/owner-dashboard';
 
 @Resolver(() => Booking)
 export class BookingResolver {
 	constructor(private readonly bookingService: BookingService) {}
+
+	@Roles(MemberType.HOTEL_OWNER)
+	@UseGuards(RolesGuard)
+	@Query(() => OwnerDashboard)
+	public async getOwnerDashboard(@AuthMember('_id') memberId: Types.ObjectId): Promise<OwnerDashboard> {
+		return await this.bookingService.getOwnerDashboard(memberId);
+	}
 
 	@Roles(MemberType.HOTEL_OWNER)
 	@UseGuards(RolesGuard)

@@ -14,6 +14,7 @@ import { ViewService } from '../view/view.service';
 import { ViewGroup } from '../../libs/enums/view.enum';
 import { MemberService } from '../member/member.service';
 import { HotelSort, HotelStatus } from '../../libs/enums/hotel.enum';
+import { RoomStatus } from '../../libs/enums/room.enum';
 import { Message } from '../../libs/enums/common.enum';
 
 @Injectable()
@@ -155,6 +156,34 @@ export class HotelService {
 	public async getHotels(input: HotelsInquiry): Promise<Hotels> {
 		const match: FilterQuery<Hotel> = { hotelStatus: HotelStatus.ACTIVE };
 		return await this.getHotelList(match, input);
+	}
+
+	public async getOwnerInventoryCounts(ownerId: Types.ObjectId): Promise<{ totalHotels: number; totalRooms: number }> {
+		const [result] = await this.hotelModel
+			.aggregate<{ totalHotels: number; totalRooms: number }>([
+				{ $match: { ownerId, hotelStatus: { $in: [HotelStatus.ACTIVE, HotelStatus.PAUSED] } } },
+				{
+					$lookup: {
+						from: 'rooms',
+						localField: '_id',
+						foreignField: 'hotelId',
+						as: 'roomStats',
+						pipeline: [
+							{ $match: { roomStatus: { $in: [RoomStatus.ACTIVE, RoomStatus.PAUSED] } } },
+							{ $group: { _id: null, totalRooms: { $sum: '$roomQuantity' } } },
+						],
+					},
+				},
+				{
+					$group: {
+						_id: null,
+						totalHotels: { $sum: 1 },
+						totalRooms: { $sum: { $ifNull: [{ $arrayElemAt: ['$roomStats.totalRooms', 0] }, 0] } },
+					},
+				},
+			])
+			.exec();
+		return { totalHotels: result?.totalHotels ?? 0, totalRooms: result?.totalRooms ?? 0 };
 	}
 
 	public async getAllHotelsByAdmin(input: AllHotelsInquiry): Promise<Hotels> {
