@@ -12,6 +12,9 @@ import { CommentService } from '../../src/components/comment/comment.service';
 import { CommentGroup, CommentStatus } from '../../src/libs/enums/comment.enum';
 import FollowSchema from '../../src/schemas/Follow.model';
 import { FollowService } from '../../src/components/follow/follow.service';
+import BoardArticleSchema from '../../src/schemas/BoardArticle.model';
+import { BoardArticleService } from '../../src/components/board-article/board-article.service';
+import { BoardArticleCategory, BoardArticleStatus } from '../../src/libs/enums/board-article.enum';
 import { HotelService } from '../../src/components/hotel/hotel.service';
 import { RoomService } from '../../src/components/room/room.service';
 import { BookingService } from '../../src/components/booking/booking.service';
@@ -30,6 +33,7 @@ integration('Booking transactions against real MongoDB', () => {
 	let likes: Model<any>, likeService: LikeService;
 	let comments: Model<any>, commentService: CommentService;
 	let follows: Model<any>, followService: FollowService;
+	let articles: Model<any>, articleService: BoardArticleService;
 	let hotelService: HotelService, roomService: RoomService, bookingService: BookingService;
 	let hotelId: Types.ObjectId, roomId: Types.ObjectId, ownerId: Types.ObjectId;
 	const guestId = new Types.ObjectId();
@@ -46,11 +50,13 @@ integration('Booking transactions against real MongoDB', () => {
 		likes = connection.model('Like', LikeSchema);
 		comments = connection.model('Comment', CommentSchema);
 		follows = connection.model('Follow', FollowSchema);
+		articles = connection.model('BoardArticle', BoardArticleSchema);
 		await follows.init();
 		await comments.init();
 		await Promise.all([hotels.init(), rooms.init(), bookings.init(), members.init(), likes.init()]);
 		likeService = new LikeService(likes, hotels, connection);
 		const memberService = new MemberService(members, {} as any, {} as any, {} as any, {} as any);
+		articleService = new BoardArticleService(articles, memberService, {} as any, likeService, connection);
 		followService = new FollowService(follows, memberService, members, connection);
 		commentService = new CommentService(comments, memberService, {} as any, {} as any, bookings, hotels, connection);
 		hotelService = new HotelService(connection, memberService, {} as any, hotels, bookings);
@@ -62,6 +68,7 @@ integration('Booking transactions against real MongoDB', () => {
 		await repl?.stop();
 	});
 	beforeEach(async () => {
+		await articles.deleteMany({});
 		await follows.deleteMany({});
 		await comments.deleteMany({});
 		await Promise.all([
@@ -115,6 +122,45 @@ integration('Booking transactions against real MongoDB', () => {
 		rooms: 1,
 		requestId: randomUUID(),
 		...change,
+	});
+	const articleInput = {
+		articleCategory: BoardArticleCategory.TRAVEL_TIPS,
+		articleTitle: '[Seoul] guide',
+		articleContent: 'Useful travel advice',
+	};
+	it('keeps article counts consistent and prevents editing another authors article or deleting twice', async () => {
+		const article = await articleService.createBoardArticle(ownerId as any, articleInput);
+		expect((await members.findById(ownerId))!.memberArticles).toBe(1);
+		await expect(
+			articleService.updateBoardArticle(guestId as any, { _id: article._id, articleTitle: 'Changed title' }),
+		).rejects.toMatchObject({ status: 404 });
+		await articleService.updateBoardArticleByAdmin({ _id: article._id, articleStatus: BoardArticleStatus.DELETE });
+		await expect(
+			articleService.updateBoardArticleByAdmin({ _id: article._id, articleStatus: BoardArticleStatus.DELETE }),
+		).rejects.toMatchObject({ status: 404 });
+		expect((await members.findById(ownerId))!.memberArticles).toBe(0);
+	});
+	it('rolls back article creation when its member counter cannot be updated', async () => {
+		await expect(articleService.createBoardArticle(new Types.ObjectId() as any, articleInput)).rejects.toBeDefined();
+		expect(await articles.countDocuments()).toBe(0);
+	});
+	it('searches literal article text and returns public author data without losing missing-author articles', async () => {
+		const article = await articleService.createBoardArticle(ownerId as any, articleInput);
+		await articleService.createBoardArticle(ownerId as any, { ...articleInput, articleTitle: 'Seoul hotels' });
+		const result = await articleService.getBoardArticles(null as any, {
+			page: 1,
+			limit: 10,
+			search: { text: '[Seoul]' },
+		});
+		expect(result.metaCounter).toEqual([{ total: 1 }]);
+		expect(Object.keys(result.list[0].memberData!).sort()).toEqual(['_id', 'memberImage', 'memberNick']);
+		const detail = await articleService.getBoardArticle(null as any, article._id);
+		expect(detail.memberData!.memberNick).toBe('owner');
+		await members.deleteOne({ _id: ownerId });
+		expect((await articleService.getBoardArticle(null as any, article._id)).memberData).toBeUndefined();
+		expect(
+			(await articleService.getBoardArticles(null as any, { page: 1, limit: 10, search: {} })).metaCounter,
+		).toEqual([{ total: 2 }]);
 	});
 	const followGuest = () =>
 		members.create({ _id: guestId, memberNick: 'guest', memberEmail: 'guest@test.invalid', memberPassword: 'private' });

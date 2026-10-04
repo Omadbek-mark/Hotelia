@@ -4,11 +4,11 @@ import { Error as MongooseError, ClientSession, Connection, FilterQuery, Model, 
 import { Booking } from '../../libs/dto/booking/booking';
 import { inventoryBookingFilter } from '../../libs/booking/inventory';
 import { Hotel, Hotels } from '../../libs/dto/hotel/hotel';
-import { HotelsInquiry, OwnerHotelsInquiry } from '../../libs/dto/hotel/hotel.inquiry';
+import { AllHotelsInquiry, HotelsInquiry, OwnerHotelsInquiry } from '../../libs/dto/hotel/hotel.inquiry';
 import { escapeSearchText } from '../../libs/search';
 import { MemberStatus, MemberType } from '../../libs/enums/member.enum';
 import { HotelInput } from '../../libs/dto/hotel/hotel.input';
-import { HotelUpdate } from '../../libs/dto/hotel/hotel.update';
+import { AdminHotelUpdate, HotelUpdate } from '../../libs/dto/hotel/hotel.update';
 import { shapeIntoMongoObjectId } from '../../libs/config';
 import { ViewService } from '../view/view.service';
 import { ViewGroup } from '../../libs/enums/view.enum';
@@ -155,6 +155,35 @@ export class HotelService {
 	public async getHotels(input: HotelsInquiry): Promise<Hotels> {
 		const match: FilterQuery<Hotel> = { hotelStatus: HotelStatus.ACTIVE };
 		return await this.getHotelList(match, input);
+	}
+
+	public async getAllHotelsByAdmin(input: AllHotelsInquiry): Promise<Hotels> {
+		const match: FilterQuery<Hotel> = {};
+		if (input.hotelStatus !== undefined) match.hotelStatus = input.hotelStatus;
+		if (input.ownerId !== undefined) match.ownerId = shapeIntoMongoObjectId(input.ownerId);
+		return await this.getHotelList(match, input);
+	}
+
+	public async getHotelByAdmin(hotelId: Types.ObjectId): Promise<Hotel> {
+		const hotel = await this.hotelModel.findOne({ _id: hotelId }).lean().exec();
+		if (!hotel) throw new NotFoundException(Message.NO_DATA_FOUND);
+		hotel.memberData = await this.memberService.getHotelOwner(hotel.ownerId);
+		return hotel;
+	}
+
+	public async updateHotelByAdmin(input: AdminHotelUpdate): Promise<Hotel> {
+		if (![HotelStatus.ACTIVE, HotelStatus.PAUSED].includes(input.hotelStatus)) {
+			throw new BadRequestException(Message.NOT_ALLOWED_REQUEST);
+		}
+		const hotel = await this.hotelModel
+			.findOneAndUpdate(
+				{ _id: shapeIntoMongoObjectId(input._id), hotelStatus: { $in: [HotelStatus.ACTIVE, HotelStatus.PAUSED] } },
+				{ $set: { hotelStatus: input.hotelStatus } },
+				{ new: true, runValidators: true },
+			)
+			.exec();
+		if (!hotel) throw new NotFoundException(Message.NO_DATA_FOUND);
+		return hotel;
 	}
 
 	public async getOwnerHotels(memberId: Types.ObjectId, input: OwnerHotelsInquiry): Promise<Hotels> {

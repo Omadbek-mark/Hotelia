@@ -74,6 +74,60 @@ describe('getHotel GraphQL', () => {
 			variableValues: { input },
 			contextValue: { req: { headers: {} } },
 		});
+	const adminRun = (source: string, input: unknown, signedIn = true) =>
+		graphql({
+			schema: app.get(GraphQLSchemaHost).schema,
+			source,
+			variableValues: { input },
+			contextValue: { req: { headers: signedIn ? { authorization: 'Bearer valid' } : {} } },
+		});
+	const adminQueries = [
+		['query($input:AllHotelsInquiry!){getAllHotelsByAdmin(input:$input){list{_id} metaCounter{total}}}', {}],
+		['query($input:String!){getHotelByAdmin(hotelId:$input){_id hotelStatus}}', String(id)],
+		[
+			'mutation($input:AdminHotelUpdate!){updateHotelByAdmin(input:$input){_id hotelStatus}}',
+			{ _id: String(id), hotelStatus: 'PAUSED' },
+		],
+	] as const;
+	it('denies all hotel admin operations to guests, users and owners', async () => {
+		for (const role of ['USER', 'HOTEL_OWNER', 'GUEST']) {
+			auth.verifyToken.mockResolvedValue({ _id: id, memberType: role });
+			for (const [source, input] of adminQueries)
+				expect((await adminRun(source, input, role !== 'GUEST')).errors).toBeDefined();
+		}
+		expect(storage.aggregate).not.toHaveBeenCalled();
+		expect(storage.findOne).not.toHaveBeenCalled();
+		expect(storage.findOneAndUpdate).not.toHaveBeenCalled();
+	});
+	it('filters admin hotel lists by owner and status and reads deleted detail without views', async () => {
+		auth.verifyToken.mockResolvedValue({ _id: id, memberType: 'ADMIN' });
+		storage.aggregate.mockReturnValue({ exec: async () => [{ list: [], metaCounter: [] }] });
+		expect((await adminRun(adminQueries[0][0], { ownerId: String(id), hotelStatus: 'DELETE' })).errors).toBeUndefined();
+		expect(storage.aggregate.mock.calls[0][0][0]).toEqual({ $match: { ownerId: id, hotelStatus: 'DELETE' } });
+		storage.findOne.mockReturnValue({ lean: () => ({ exec: async () => ({ _id: id, hotelStatus: 'DELETE' }) }) });
+		expect((await adminRun(adminQueries[1][0], String(id))).errors).toBeUndefined();
+		expect(storage.findOne).toHaveBeenCalledWith({ _id: id });
+		expect(views.recordView).not.toHaveBeenCalled();
+	});
+	it('allows admin status changes only on nondeleted hotels and rejects forged update fields', async () => {
+		auth.verifyToken.mockResolvedValue({ _id: id, memberType: 'ADMIN' });
+		for (const change of [{ hotelStatus: 'DELETE' }, { ownerId: String(id) }, { hotelLikes: 50 }, { _id: 'bad' }]) {
+			expect(
+				(await adminRun(adminQueries[2][0], { _id: String(id), hotelStatus: 'PAUSED', ...change })).errors,
+			).toBeDefined();
+		}
+		expect(storage.findOneAndUpdate).not.toHaveBeenCalled();
+		storage.findOneAndUpdate.mockReturnValue({ exec: async () => ({ _id: id, hotelStatus: 'PAUSED' }) });
+		expect((await adminRun(...adminQueries[2])).errors).toBeUndefined();
+		expect(storage.findOneAndUpdate).toHaveBeenCalledWith(
+			{ _id: id, hotelStatus: { $in: ['ACTIVE', 'PAUSED'] } },
+			{ $set: { hotelStatus: 'PAUSED' } },
+			{ new: true, runValidators: true },
+		);
+		expect(members.memberStatsEditor).not.toHaveBeenCalled();
+		storage.findOneAndUpdate.mockReturnValue({ exec: async () => null });
+		expect(((await adminRun(...adminQueries[2])).errors?.[0].originalError as any).getStatus()).toBe(404);
+	});
 	const favoriteMutation = (action: string, hotelId = String(id), signedIn = true) =>
 		graphql({
 			schema: app.get(GraphQLSchemaHost).schema,
