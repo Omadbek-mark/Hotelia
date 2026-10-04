@@ -3,6 +3,8 @@ import { CommentGroup, CommentStatus } from '../libs/enums/comment.enum';
 
 const CommentSchema = new Schema(
 	{
+		bookingId: { type: Schema.Types.ObjectId, ref: 'Booking', immutable: true },
+		rating: { type: Number, min: 1, max: 5, validate: Number.isInteger },
 		commentStatus: {
 			type: String,
 			enum: CommentStatus,
@@ -33,4 +35,9 @@ const CommentSchema = new Schema(
 	{ timestamps: true, collection: 'comments' },
 );
 
+CommentSchema.index(
+	{ bookingId: 1 },
+	{ unique: true, partialFilterExpression: { commentGroup: CommentGroup.HOTEL, bookingId: { $type: 'objectId' } } },
+);
+CommentSchema.index({ commentRefId: 1, commentStatus: 1, createdAt: -1 });
 export default CommentSchema;

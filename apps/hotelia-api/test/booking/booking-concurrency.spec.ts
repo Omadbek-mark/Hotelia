@@ -7,6 +7,9 @@ import BookingSchema from '../../src/schemas/Booking.model';
 import MemberSchema from '../../src/schemas/Member.model';
 import LikeSchema from '../../src/schemas/Like.model';
 import { LikeService } from '../../src/components/like/like.service';
+import CommentSchema from '../../src/schemas/Comment.model';
+import { CommentService } from '../../src/components/comment/comment.service';
+import { CommentGroup, CommentStatus } from '../../src/libs/enums/comment.enum';
 import { HotelService } from '../../src/components/hotel/hotel.service';
 import { RoomService } from '../../src/components/room/room.service';
 import { BookingService } from '../../src/components/booking/booking.service';
@@ -23,6 +26,7 @@ integration('Booking transactions against real MongoDB', () => {
 	let connection: Connection;
 	let hotels: Model<any>, rooms: Model<any>, bookings: Model<any>, members: Model<any>;
 	let likes: Model<any>, likeService: LikeService;
+	let comments: Model<any>, commentService: CommentService;
 	let hotelService: HotelService, roomService: RoomService, bookingService: BookingService;
 	let hotelId: Types.ObjectId, roomId: Types.ObjectId, ownerId: Types.ObjectId;
 	const guestId = new Types.ObjectId();
@@ -37,9 +41,12 @@ integration('Booking transactions against real MongoDB', () => {
 		bookings = connection.model('Booking', BookingSchema);
 		members = connection.model('Member', MemberSchema);
 		likes = connection.model('Like', LikeSchema);
+		comments = connection.model('Comment', CommentSchema);
+		await comments.init();
 		await Promise.all([hotels.init(), rooms.init(), bookings.init(), members.init(), likes.init()]);
 		likeService = new LikeService(likes, hotels, connection);
 		const memberService = new MemberService(members, {} as any, {} as any, {} as any, {} as any);
+		commentService = new CommentService(comments, memberService, {} as any, {} as any, bookings, hotels, connection);
 		hotelService = new HotelService(connection, memberService, {} as any, hotels, bookings);
 		roomService = new RoomService(rooms, hotelService, connection, bookings);
 		bookingService = new BookingService(bookings, rooms, connection, hotelService);
@@ -49,6 +56,7 @@ integration('Booking transactions against real MongoDB', () => {
 		await repl?.stop();
 	});
 	beforeEach(async () => {
+		await comments.deleteMany({});
 		await Promise.all([
 			bookings.deleteMany({}),
 			rooms.deleteMany({}),
@@ -190,6 +198,74 @@ integration('Booking transactions against real MongoDB', () => {
 			bookingStatus: 'CONFIRMED',
 			...extra,
 		});
+	const reviewInput = (bookingId: unknown, rating = 5) => ({
+		commentGroup: CommentGroup.HOTEL,
+		commentRefId: hotelId as any,
+		bookingId: String(bookingId),
+		rating,
+		commentContent: 'Enjoyed my stay',
+	});
+	it('requires the members own completed booking for the matching hotel', async () => {
+		const booking = await seed('2020-01-01', '2020-01-03', 1);
+		await expect(commentService.createComment(guestId as any, reviewInput(booking._id))).rejects.toMatchObject({
+			status: 404,
+		});
+		await bookingService.completeBooking(ownerId, booking._id);
+		await expect(commentService.createComment(ownerId as any, reviewInput(booking._id))).rejects.toMatchObject({
+			status: 404,
+		});
+		await expect(
+			commentService.createComment(guestId as any, {
+				...reviewInput(booking._id),
+				commentRefId: new Types.ObjectId() as any,
+			}),
+		).rejects.toMatchObject({ status: 404 });
+		expect(await comments.countDocuments()).toBe(0);
+	});
+	it('prevents duplicate reviews and keeps rating correct across parallel create, update and delete', async () => {
+		const a = await seed('2020-01-01', '2020-01-03', 1, { bookingStatus: 'COMPLETED' });
+		const b = await seed('2020-02-01', '2020-02-03', 1, { bookingStatus: 'COMPLETED' });
+		const duplicate = await Promise.allSettled([
+			commentService.createComment(guestId as any, reviewInput(a._id, 5)),
+			commentService.createComment(guestId as any, reviewInput(a._id, 5)),
+		]);
+		expect(duplicate.filter((item) => item.status === 'fulfilled')).toHaveLength(1);
+		const review = await comments.findOne({ bookingId: a._id });
+		await Promise.all([
+			commentService.updateComment(guestId as any, { _id: review._id, rating: 3 }),
+			commentService.createComment(guestId as any, reviewInput(b._id, 1)),
+		]);
+		expect((await hotels.findById(hotelId))!.toObject()).toMatchObject({ hotelReviews: 2, hotelRating: 2 });
+		await expect(commentService.updateComment(ownerId as any, { _id: review._id, rating: 5 })).rejects.toMatchObject({
+			status: 404,
+		});
+		await commentService.updateComment(guestId as any, { _id: review._id, commentStatus: CommentStatus.DELETE });
+		expect((await hotels.findById(hotelId))!.toObject()).toMatchObject({ hotelReviews: 1, hotelRating: 1 });
+		await expect(commentService.createComment(guestId as any, reviewInput(a._id))).rejects.toMatchObject({
+			status: 409,
+		});
+		const remaining = await comments.findOne({ bookingId: b._id });
+		await commentService.removeCommentByAdmin(remaining._id);
+		expect((await hotels.findById(hotelId))!.toObject()).toMatchObject({ hotelReviews: 0, hotelRating: 0 });
+	}, 30000);
+	it('projects public review authors and keeps pagination totals when an author is missing', async () => {
+		const a = await seed('2020-01-01', '2020-01-03', 1, { bookingStatus: 'COMPLETED' });
+		await commentService.createComment(guestId as any, reviewInput(a._id));
+		const inquiry = { page: 1, limit: 10, search: { commentRefId: hotelId as any, commentGroup: CommentGroup.HOTEL } };
+		const result = await commentService.getComments(null as any, inquiry);
+		expect(result.metaCounter).toEqual([{ total: 1 }]);
+		expect(result.list).toHaveLength(1);
+		await members.create({
+			_id: guestId,
+			memberNick: 'reviewer',
+			memberEmail: 'review@test.invalid',
+			memberPassword: 'hidden',
+		});
+		const populated = await commentService.getComments(null as any, inquiry);
+		expect(Object.keys(populated.list[0].memberData!).sort()).toEqual(['_id', 'memberImage', 'memberNick']);
+		await hotels.updateOne({ _id: hotelId }, { $set: { hotelStatus: 'PAUSED' } });
+		await expect(commentService.getComments(null as any, inquiry)).rejects.toMatchObject({ status: 404 });
+	});
 
 	it('calculates immutable USD snapshots and a 15-minute pending hold', async () => {
 		const before = Date.now();
