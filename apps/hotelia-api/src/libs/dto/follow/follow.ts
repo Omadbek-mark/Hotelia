@@ -1,6 +1,7 @@
 import { Field, ObjectType } from '@nestjs/graphql';
 import type { ObjectId } from 'mongoose';
-import { Member, TotalCounter } from '../member/member';
+import { TotalCounter } from '../member/member';
+import { MemberPublic } from '../member/member-public';
 import { MeLiked } from '../like/like';
 
 @ObjectType()
@@ -40,8 +41,8 @@ export class Follower {
 	@Field(() => [MeFollowed], { nullable: true })
 	meFollowed?: MeFollowed[];
 
-	@Field(() => Member, { nullable: true })
-	followerData?: Member;
+	@Field(() => MemberPublic, { nullable: true })
+	followerData?: MemberPublic;
 }
 
 @ObjectType()
@@ -69,8 +70,8 @@ export class Following {
 	@Field(() => [MeFollowed], { nullable: true })
 	meFollowed?: MeFollowed[];
 
-	@Field(() => Member, { nullable: true })
-	followingData?: Member;
+	@Field(() => MemberPublic, { nullable: true })
+	followingData?: MemberPublic;
 }
 
 @ObjectType()
