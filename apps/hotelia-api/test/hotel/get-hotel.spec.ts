@@ -11,6 +11,7 @@ import { HotelResolver } from '../../src/components/hotel/hotel.resolver';
 import { MemberService } from '../../src/components/member/member.service';
 import { AuthService } from '../../src/components/auth/auth.service';
 import { HotelStatus } from '../../src/libs/enums/hotel.enum';
+import { LikeService } from '../../src/components/like/like.service';
 
 describe('getHotel GraphQL', () => {
 	let app: INestApplication;
@@ -19,6 +20,7 @@ describe('getHotel GraphQL', () => {
 	const bookings = { exists: jest.fn() };
 	const members = { getHotelOwner: jest.fn(), memberStatsEditor: jest.fn() };
 	const views = { recordView: jest.fn() };
+	const likes = { attachFavoriteStatus: jest.fn(), setHotelFavorite: jest.fn(), getFavoriteHotels: jest.fn() };
 	const session = {};
 	const connection = { transaction: jest.fn(async (callback) => callback(session)) };
 	const auth = { verifyToken: jest.fn() };
@@ -30,6 +32,7 @@ describe('getHotel GraphQL', () => {
 				HotelResolver,
 				{ provide: getConnectionToken(), useValue: connection },
 				{ provide: ViewService, useValue: views },
+				{ provide: LikeService, useValue: likes },
 				{ provide: getModelToken('Hotel'), useValue: storage },
 				{ provide: getModelToken('Booking'), useValue: bookings },
 				{ provide: MemberService, useValue: members },
@@ -43,6 +46,9 @@ describe('getHotel GraphQL', () => {
 	afterAll(async () => app?.close());
 	beforeEach(() => {
 		jest.resetAllMocks();
+		likes.attachFavoriteStatus.mockImplementation(async (hotels) => {
+			for (const hotel of hotels) hotel.isFavorite = false;
+		});
 		bookings.exists.mockReturnValue({ session: () => ({ exec: async () => null }) });
 		connection.transaction.mockImplementation(async (callback) => callback(session));
 		members.getHotelOwner.mockResolvedValue(null);
@@ -68,6 +74,50 @@ describe('getHotel GraphQL', () => {
 			variableValues: { input },
 			contextValue: { req: { headers: {} } },
 		});
+	const favoriteMutation = (action: string, hotelId = String(id), signedIn = true) =>
+		graphql({
+			schema: app.get(GraphQLSchemaHost).schema,
+			source: `mutation($id:String!){${action}(hotelId:$id){hotelId isFavorite hotelLikes}}`,
+			variableValues: { id: hotelId },
+			contextValue: { req: { headers: signedIn ? { authorization: 'Bearer valid' } : {} } },
+		});
+	it.each(['favoriteHotel', 'unfavoriteHotel'])('%s requires authentication and a valid hotel ID', async (action) => {
+		expect((await favoriteMutation(action, undefined, false)).errors).toBeDefined();
+		auth.verifyToken.mockResolvedValue({ _id: id, memberType: 'USER' });
+		expect((await favoriteMutation(action, 'bad')).errors).toBeDefined();
+		expect(likes.setHotelFavorite).not.toHaveBeenCalled();
+		likes.setHotelFavorite.mockResolvedValue({ hotelId: id, isFavorite: action === 'favoriteHotel', hotelLikes: 1 });
+		expect((await favoriteMutation(action)).errors).toBeUndefined();
+		expect(likes.setHotelFavorite).toHaveBeenCalledWith(id, id, action === 'favoriteHotel');
+	});
+	it('validates favorites pagination and obtains member identity from authentication', async () => {
+		const query = (input: unknown, signedIn = true) =>
+			graphql({
+				schema: app.get(GraphQLSchemaHost).schema,
+				source: 'query($input:FavoritesInquiry!){getFavorites(input:$input){list{_id isFavorite} metaCounter{total}}}',
+				variableValues: { input },
+				contextValue: { req: { headers: signedIn ? { authorization: 'Bearer valid' } : {} } },
+			});
+		expect((await query({}, false)).errors).toBeDefined();
+		auth.verifyToken.mockResolvedValue({ _id: id, memberType: 'USER' });
+		for (const input of [{ page: 0 }, { limit: 101 }, { memberId: String(id) }])
+			expect((await query(input)).errors).toBeDefined();
+		expect(likes.getFavoriteHotels).not.toHaveBeenCalled();
+		likes.getFavoriteHotels.mockResolvedValue({ list: [], metaCounter: [] });
+		expect((await query({})).errors).toBeUndefined();
+		expect(likes.getFavoriteHotels).toHaveBeenCalledWith(id, expect.objectContaining({ page: 1, limit: 20 }));
+	});
+	it('personalizes public hotel detail and list without requiring guest authentication', async () => {
+		await run();
+		expect(likes.attachFavoriteStatus).toHaveBeenLastCalledWith(expect.any(Array), null);
+		auth.verifyToken.mockResolvedValue({ _id: id, memberType: 'USER' });
+		views.recordView.mockResolvedValue(false);
+		await run(String(id), 'valid');
+		expect(likes.attachFavoriteStatus).toHaveBeenLastCalledWith(expect.any(Array), id);
+		storage.aggregate.mockReturnValue({ exec: async () => [{ list: [], metaCounter: [] }] });
+		expect((await runList({})).errors).toBeUndefined();
+		expect(likes.attachFavoriteStatus).toHaveBeenLastCalledWith([], null);
+	});
 	const ownerDetail = (hotelId = String(id), signedIn = true) =>
 		graphql({
 			schema: app.get(GraphQLSchemaHost).schema,
