@@ -1,5 +1,5 @@
 import { Field, InputType, Int } from '@nestjs/graphql';
-import { IsEnum, IsInt, Max, Min, ValidateIf } from 'class-validator';
+import { IsEnum, IsInt, IsMongoId, IsString, Matches, Max, Min, ValidateIf } from 'class-validator';
 import { BookingStatus } from '../../enums/booking.enum';
 
 @InputType()
@@ -20,4 +20,24 @@ export class BookingsInquiry {
 	@IsEnum(BookingStatus)
 	@Field(() => BookingStatus, { nullable: true })
 	bookingStatus?: BookingStatus;
+}
+
+@InputType()
+export class OwnerBookingsInquiry extends BookingsInquiry {
+	@ValidateIf((_, value) => value !== undefined)
+	@IsMongoId()
+	@Field(() => String, { nullable: true })
+	hotelId?: string;
+
+	@ValidateIf((_, value) => value !== undefined)
+	@IsString()
+	@Matches(/^\d{4}-\d{2}-\d{2}$/)
+	@Field(() => String, { nullable: true })
+	checkIn?: string;
+
+	@ValidateIf((_, value) => value !== undefined)
+	@IsString()
+	@Matches(/^\d{4}-\d{2}-\d{2}$/)
+	@Field(() => String, { nullable: true })
+	checkOut?: string;
 }

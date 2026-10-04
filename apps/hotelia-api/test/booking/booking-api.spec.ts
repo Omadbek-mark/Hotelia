@@ -40,7 +40,12 @@ describe('Booking read API', () => {
 		storage.findOne.mockReturnValue({
 			lean: () => ({ exec: async () => ({ _id: bookingId, memberId, bookingStatus: 'CANCELLED', totalPrice: 500 }) }),
 		});
-		storage.aggregate.mockReturnValue({ exec: async () => [{ list: [], metaCounter: [] }] });
+		storage.aggregate.mockImplementation((pipeline) => ({
+			exec: async () =>
+				pipeline.some((stage) => stage.$facet)
+					? [{ list: [], metaCounter: [] }]
+					: [{ _id: bookingId, memberId, bookingStatus: 'CANCELLED', totalPrice: 500 }],
+		}));
 	});
 	const run = (source: string, variableValues: Record<string, unknown>, signedIn = true) =>
 		graphql({
@@ -151,26 +156,23 @@ describe('Booking read API', () => {
 			bookingStatus: 'CANCELLED',
 			totalPrice: 500,
 		});
-		expect(storage.findOne).toHaveBeenCalledWith({ _id: bookingId, memberId });
+		expect(storage.aggregate.mock.calls[0][0][0]).toEqual({ $match: { _id: bookingId, memberId } });
 	});
 	it('hides a booking belonging to someone else', async () => {
-		const otherId = new Types.ObjectId();
-		storage.findOne.mockImplementation((filter) => ({
-			lean: () => ({ exec: async () => (filter.memberId.equals(otherId) ? { _id: bookingId } : null) }),
-		}));
+		storage.aggregate.mockReturnValue({ exec: async () => [] });
 		expect(((await detail()).errors?.[0].originalError as any).getStatus()).toBe(404);
 	});
 	it('rejects invalid IDs before database access', async () => {
 		expect((await detail('invalid')).errors).toBeDefined();
-		expect(storage.findOne).not.toHaveBeenCalled();
+		expect(storage.aggregate).not.toHaveBeenCalled();
 	});
 	it('uses default pagination and scopes list and total to the authenticated member', async () => {
 		expect((await list()).errors).toBeUndefined();
-		expect(storage.aggregate.mock.calls[0][0]).toEqual([
-			{ $match: { memberId } },
-			{ $sort: { createdAt: -1, _id: -1 } },
-			{ $facet: { list: [{ $skip: 0 }, { $limit: 20 }], metaCounter: [{ $count: 'total' }] } },
-		]);
+		const pipeline = storage.aggregate.mock.calls[0][0];
+		expect(pipeline[0]).toEqual({ $match: { memberId } });
+		expect(pipeline[1]).toEqual({ $sort: { createdAt: -1, _id: -1 } });
+		expect(pipeline[2].$facet.list.slice(0, 2)).toEqual([{ $skip: 0 }, { $limit: 20 }]);
+		expect(pipeline[2].$facet.metaCounter).toEqual([{ $count: 'total' }]);
 	});
 	it.each(['PENDING', 'CONFIRMED', 'CANCELLED', 'COMPLETED'])(
 		'filters %s bookings before pagination',
@@ -178,7 +180,7 @@ describe('Booking read API', () => {
 			expect((await list({ bookingStatus, page: 3, limit: 5 })).errors).toBeUndefined();
 			const pipeline = storage.aggregate.mock.calls[0][0];
 			expect(pipeline[0].$match).toEqual({ memberId, bookingStatus });
-			expect(pipeline[2].$facet.list).toEqual([{ $skip: 10 }, { $limit: 5 }]);
+			expect(pipeline[2].$facet.list.slice(0, 2)).toEqual([{ $skip: 10 }, { $limit: 5 }]);
 		},
 	);
 	it.each([
@@ -207,5 +209,63 @@ describe('Booking read API', () => {
 		});
 		expect((await detail()).errors?.[0].originalError).toBe(error);
 		expect((await list()).errors?.[0].originalError).toBe(error);
+	});
+	const ownerList = (input: unknown = {}, signedIn = true) =>
+		run(
+			'query($input:OwnerBookingsInquiry!){getOwnerBookings(input:$input){list{_id} metaCounter{total}}}',
+			{ input },
+			signedIn,
+		);
+	const ownerDetail = (id = String(bookingId), signedIn = true) =>
+		run('query($id:String!){getOwnerBooking(bookingId:$id){_id}}', { id }, signedIn);
+	it('requires the owner role for both owner queries', async () => {
+		expect((await ownerList({}, false)).errors).toBeDefined();
+		expect((await ownerDetail(undefined, false)).errors).toBeDefined();
+		for (const memberType of ['USER', 'ADMIN']) {
+			auth.verifyToken.mockResolvedValue({ _id: memberId, memberType });
+			expect((await ownerList()).errors).toBeDefined();
+			expect((await ownerDetail()).errors).toBeDefined();
+		}
+		expect(storage.aggregate).not.toHaveBeenCalled();
+	});
+	it('validates owner filters and IDs before querying storage', async () => {
+		auth.verifyToken.mockResolvedValue({ _id: memberId, memberType: 'HOTEL_OWNER' });
+		for (const input of [
+			{ hotelId: 'bad' },
+			{ hotelId: null },
+			{ ownerId: String(memberId) },
+			{ page: 0 },
+			{ limit: 101 },
+			{ bookingStatus: 'bad' },
+			{ checkIn: null },
+			{ checkIn: '2035-09-10' },
+			{ checkIn: '2035-02-30', checkOut: '2035-03-01' },
+			{ checkIn: '2035-09-12', checkOut: '2035-09-10' },
+		])
+			expect((await ownerList(input)).errors).toBeDefined();
+		expect((await ownerDetail('bad')).errors).toBeDefined();
+		expect(storage.aggregate).not.toHaveBeenCalled();
+	});
+	it('uses the authenticated owner in the ownership lookup before counting and pagination', async () => {
+		auth.verifyToken.mockResolvedValue({ _id: memberId, memberType: 'HOTEL_OWNER' });
+		expect((await ownerList()).errors).toBeUndefined();
+		const pipeline = storage.aggregate.mock.calls[0][0];
+		expect(pipeline[1].$lookup.pipeline[0]).toEqual({ $match: { ownerId: memberId } });
+		expect(pipeline[2]).toEqual({ $match: { 'ownedHotel.0': { $exists: true } } });
+		expect(pipeline.findIndex((stage) => stage.$facet)).toBeGreaterThan(2);
+		expect((await ownerDetail()).errors).toBeUndefined();
+	});
+	it('exposes nullable booking relation fields but rejects sensitive member fields', async () => {
+		const query =
+			'query($id:String!){getBooking(bookingId:$id){hotelData{hotelName} roomData{roomName} memberData{memberNick}}}';
+		const result = await run(query, { id: String(bookingId) });
+		expect(result.errors).toBeUndefined();
+		expect(result.data?.getBooking).toEqual({ hotelData: null, roomData: null, memberData: null });
+		for (const field of ['memberPassword', 'memberEmail', 'memberPhone', 'accessToken']) {
+			expect(
+				(await run(`query($id:String!){getBooking(bookingId:$id){memberData{${field}}}}`, { id: String(bookingId) }))
+					.errors,
+			).toBeDefined();
+		}
 	});
 });

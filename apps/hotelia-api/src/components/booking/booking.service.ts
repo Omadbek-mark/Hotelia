@@ -13,9 +13,9 @@ import { PENDING_HOLD_MS } from '../../libs/booking/inventory';
 import { availableRoomsPipeline } from '../../libs/booking/availability-pipeline';
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectConnection, InjectModel } from '@nestjs/mongoose';
-import { Connection, FilterQuery, Model, Types } from 'mongoose';
+import { Connection, FilterQuery, Model, PipelineStage, Types } from 'mongoose';
 import { Booking, Bookings } from '../../libs/dto/booking/booking';
-import { BookingsInquiry } from '../../libs/dto/booking/booking.inquiry';
+import { BookingsInquiry, OwnerBookingsInquiry } from '../../libs/dto/booking/booking.inquiry';
 import { Message } from '../../libs/enums/common.enum';
 
 @Injectable()
@@ -193,26 +193,129 @@ export class BookingService {
 	}
 
 	public async getBooking(memberId: Types.ObjectId, bookingId: Types.ObjectId): Promise<Booking> {
-		const booking = await this.bookingModel.findOne({ _id: bookingId, memberId }).lean().exec();
+		const [booking] = await this.bookingModel
+			.aggregate<Booking>([{ $match: { _id: bookingId, memberId } }, ...this.bookingDataPipeline()])
+			.exec();
 		if (!booking) throw new NotFoundException(Message.NO_DATA_FOUND);
 		return booking;
+	}
+
+	public async getOwnerBooking(ownerId: Types.ObjectId, bookingId: Types.ObjectId): Promise<Booking> {
+		const [booking] = await this.bookingModel
+			.aggregate<Booking>([
+				{ $match: { _id: bookingId } },
+				...this.ownerBookingsPipeline(ownerId),
+				...this.bookingDataPipeline(),
+			])
+			.exec();
+		if (!booking) throw new NotFoundException(Message.NO_DATA_FOUND);
+		return booking;
+	}
+
+	public async getOwnerBookings(ownerId: Types.ObjectId, input: OwnerBookingsInquiry): Promise<Bookings> {
+		const match: FilterQuery<Booking> = {};
+		if (input.hotelId !== undefined) match.hotelId = shapeIntoMongoObjectId(input.hotelId);
+		if (input.bookingStatus) match.bookingStatus = input.bookingStatus;
+		if (input.checkIn !== undefined || input.checkOut !== undefined) {
+			if (input.checkIn === undefined || input.checkOut === undefined) {
+				throw new BadRequestException('Provide both checkIn and checkOut to filter bookings');
+			}
+			const stay = getStayDates(input.checkIn, input.checkOut);
+			// Filter reservations occupying any night in the selected range, including historical stays.
+			match.checkIn = { $lt: stay.checkOut };
+			match.checkOut = { $gt: stay.checkIn };
+		}
+		return await this.getBookingList(match, input, ownerId);
 	}
 
 	public async getMyBookings(memberId: Types.ObjectId, input: BookingsInquiry): Promise<Bookings> {
 		const match: FilterQuery<Booking> = { memberId };
 		if (input.bookingStatus) match.bookingStatus = input.bookingStatus;
+		return await this.getBookingList(match, input);
+	}
+
+	private async getBookingList(
+		match: FilterQuery<Booking>,
+		input: BookingsInquiry,
+		ownerId?: Types.ObjectId,
+	): Promise<Bookings> {
 		const result = await this.bookingModel
 			.aggregate<Bookings>([
 				{ $match: match },
+				...(ownerId ? this.ownerBookingsPipeline(ownerId) : []),
 				{ $sort: { createdAt: -1, _id: -1 } },
 				{
 					$facet: {
-						list: [{ $skip: (input.page - 1) * input.limit }, { $limit: input.limit }],
+						list: [{ $skip: (input.page - 1) * input.limit }, { $limit: input.limit }, ...this.bookingDataPipeline()],
 						metaCounter: [{ $count: 'total' }],
 					},
 				},
 			])
 			.exec();
 		return result[0] ?? { list: [], metaCounter: [] };
+	}
+
+	private ownerBookingsPipeline(ownerId: Types.ObjectId): PipelineStage[] {
+		return [
+			{
+				$lookup: {
+					from: 'hotels',
+					localField: 'hotelId',
+					foreignField: '_id',
+					pipeline: [{ $match: { ownerId } }, { $project: { _id: 1 } }],
+					as: 'ownedHotel',
+				},
+			},
+			// Ownership must be applied before pagination AND the total counter.
+			{ $match: { 'ownedHotel.0': { $exists: true } } },
+			{ $unset: 'ownedHotel' },
+		];
+	}
+
+	private bookingDataPipeline(): (PipelineStage.Lookup | PipelineStage.Unwind)[] {
+		return [
+			{
+				$lookup: {
+					from: 'hotels',
+					localField: 'hotelId',
+					foreignField: '_id',
+					as: 'hotelData',
+					pipeline: [
+						{
+							$project: {
+								_id: 1,
+								hotelName: 1,
+								hotelCountry: 1,
+								hotelCity: 1,
+								hotelAddress: 1,
+								hotelTimezone: 1,
+								hotelImages: 1,
+							},
+						},
+					],
+				},
+			},
+			{ $unwind: { path: '$hotelData', preserveNullAndEmptyArrays: true } },
+			{
+				$lookup: {
+					from: 'rooms',
+					localField: 'roomId',
+					foreignField: '_id',
+					as: 'roomData',
+					pipeline: [{ $project: { _id: 1, roomName: 1, roomType: 1, roomImages: 1 } }],
+				},
+			},
+			{ $unwind: { path: '$roomData', preserveNullAndEmptyArrays: true } },
+			{
+				$lookup: {
+					from: 'members',
+					localField: 'memberId',
+					foreignField: '_id',
+					as: 'memberData',
+					pipeline: [{ $project: { _id: 1, memberNick: 1, memberImage: 1, memberDesc: 1 } }],
+				},
+			},
+			{ $unwind: { path: '$memberData', preserveNullAndEmptyArrays: true } },
+		];
 	}
 }
