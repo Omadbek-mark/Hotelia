@@ -1,3 +1,4 @@
+import { BoConfigModule } from './bo-config/bo-config.module';
 import { Module } from '@nestjs/common';
 import { HotelModule } from './hotel/hotel.module';
 import { RoomModule } from './room/room.module';
@@ -12,6 +13,7 @@ import { CommentModule } from './comment/comment.module';
 
 @Module({
 	imports: [
+		BoConfigModule,
 		HotelModule,
 		RoomModule,
 		BookingModule,
