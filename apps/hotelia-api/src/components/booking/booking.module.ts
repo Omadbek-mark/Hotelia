@@ -1,3 +1,4 @@
+import { NotificationModule } from '../notification/notification.module';
 import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import BookingSchema from '../../schemas/Booking.model';
@@ -9,6 +10,7 @@ import { BookingResolver } from './booking.resolver';
 
 @Module({
 	imports: [
+		NotificationModule,
 		MongooseModule.forFeature([
 			{ name: 'Booking', schema: BookingSchema },
 			{ name: 'Room', schema: RoomSchema },

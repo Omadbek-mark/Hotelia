@@ -20,8 +20,11 @@ export class BookingResolver {
 	@Roles(MemberType.ADMIN)
 	@UseGuards(RolesGuard)
 	@Mutation(() => Booking)
-	public async cancelBookingByAdmin(@Args('bookingId') input: string): Promise<Booking> {
-		return this.bookingService.cancelBookingByAdmin(shapeIntoMongoObjectId(input));
+	public async cancelBookingByAdmin(
+		@Args('bookingId') input: string,
+		@AuthMember('_id') memberId: Types.ObjectId,
+	): Promise<Booking> {
+		return this.bookingService.cancelBookingByAdmin(shapeIntoMongoObjectId(input), memberId);
 	}
 
 	@Roles(MemberType.ADMIN)

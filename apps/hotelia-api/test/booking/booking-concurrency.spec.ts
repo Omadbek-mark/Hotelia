@@ -1,3 +1,5 @@
+import NotificationSchema from '../../src/schemas/Notification.model';
+import { NotificationService } from '../../src/components/notification/notification.service';
 import { BatchService } from '../../../hotelia-batch/src/batch.service';
 import { randomUUID } from 'crypto';
 import { createConnection, Connection, Model, Types } from 'mongoose';
@@ -30,6 +32,7 @@ import { getStayDates } from '../../src/libs/booking/stay-dates';
 const integration = process.env.RUN_MONGO_INTEGRATION === '1' ? describe : describe.skip;
 integration('Booking transactions against real MongoDB', () => {
 	let repl: MongoMemoryReplSet;
+	let notifications: Model<any>, notificationService: NotificationService;
 	let connection: Connection;
 	let hotels: Model<any>, rooms: Model<any>, bookings: Model<any>, members: Model<any>;
 	let likes: Model<any>, likeService: LikeService;
@@ -49,6 +52,8 @@ integration('Booking transactions against real MongoDB', () => {
 		rooms = connection.model('Room', RoomSchema);
 		bookings = connection.model('Booking', BookingSchema);
 		members = connection.model('Member', MemberSchema);
+		notifications = connection.model('Notification', NotificationSchema);
+		notificationService = new NotificationService(notifications, hotels);
 		likes = connection.model('Like', LikeSchema);
 		comments = connection.model('Comment', CommentSchema);
 		follows = connection.model('Follow', FollowSchema);
@@ -60,16 +65,25 @@ integration('Booking transactions against real MongoDB', () => {
 		const memberService = new MemberService(members, {} as any, {} as any, {} as any, {} as any);
 		articleService = new BoardArticleService(articles, memberService, {} as any, likeService, connection);
 		followService = new FollowService(follows, memberService, members, connection);
-		commentService = new CommentService(comments, memberService, {} as any, bookings, hotels, connection);
+		commentService = new CommentService(
+			comments,
+			memberService,
+			{} as any,
+			bookings,
+			hotels,
+			connection,
+			notificationService,
+		);
 		hotelService = new HotelService(connection, memberService, {} as any, hotels, bookings);
 		roomService = new RoomService(rooms, hotelService, connection, bookings);
-		bookingService = new BookingService(bookings, rooms, connection, hotelService);
+		bookingService = new BookingService(bookings, rooms, connection, hotelService, notificationService);
 	}, 180000);
 	afterAll(async () => {
 		await connection?.close();
 		await repl?.stop();
 	});
 	beforeEach(async () => {
+		await notifications.deleteMany({});
 		await articles.deleteMany({});
 		await follows.deleteMany({});
 		await comments.deleteMany({});
@@ -130,6 +144,42 @@ integration('Booking transactions against real MongoDB', () => {
 		articleTitle: '[Seoul] guide',
 		articleContent: 'Useful travel advice',
 	};
+	it('notifications follow booking events, remain private and are not duplicated by retries', async () => {
+		const request = input();
+		const booking = await bookingService.createBooking(guestId, request);
+		await bookingService.createBooking(guestId, request);
+		expect(await notificationService.getUnreadNotificationCount(ownerId)).toBe(1);
+		const list = await notificationService.getMyNotifications(ownerId, { page: 1, limit: 20 });
+		expect(list.metaCounter).toEqual([{ total: 1 }]);
+		await expect(notificationService.markNotificationRead(guestId, list.list[0]._id)).rejects.toMatchObject({
+			status: 404,
+		});
+		await notificationService.markNotificationRead(ownerId, list.list[0]._id);
+		expect(await notificationService.getUnreadNotificationCount(ownerId)).toBe(0);
+		await bookingService.confirmBooking(ownerId, booking._id);
+		expect(await notificationService.getUnreadNotificationCount(guestId)).toBe(1);
+		await bookingService.cancelBookingByAdmin(booking._id, new Types.ObjectId());
+		expect(await notifications.countDocuments({ notificationType: 'BOOKING_CANCELLED' })).toBe(2);
+		await expect(bookingService.cancelBookingByAdmin(booking._id, new Types.ObjectId())).rejects.toMatchObject({
+			status: 409,
+		});
+		expect(await notifications.countDocuments({ notificationType: 'BOOKING_CANCELLED' })).toBe(2);
+	});
+	it('notification write failures roll back booking cancellation', async () => {
+		const booking = await bookingService.createBooking(guestId, input());
+		const failure = jest
+			.spyOn(notificationService, 'notify')
+			.mockRejectedValueOnce(new Error('notification write failed'));
+		try {
+			await expect(bookingService.cancelBooking(guestId, MemberType.USER, booking._id)).rejects.toThrow(
+				'notification write failed',
+			);
+			expect((await bookings.findById(booking._id))!.bookingStatus).toBe('PENDING');
+		} finally {
+			failure.mockRestore();
+		}
+	});
+
 	it('hotel ranking batch recalculates current counters without resetting ranks or changing timestamps', async () => {
 		await hotels.updateOne({ _id: hotelId }, { $set: { hotelLikes: 3, hotelViews: 7 } });
 		await members.updateOne(
@@ -503,6 +553,9 @@ integration('Booking transactions against real MongoDB', () => {
 		]);
 		expect(duplicate.filter((item) => item.status === 'fulfilled')).toHaveLength(1);
 		const review = await comments.findOne({ bookingId: a._id });
+		expect(
+			await notifications.countDocuments({ bookingId: a._id, notificationType: 'REVIEW', receiverId: ownerId }),
+		).toBe(1);
 		await Promise.all([
 			commentService.updateComment(guestId as any, { _id: review._id, rating: 3 }),
 			commentService.createComment(guestId as any, reviewInput(b._id, 1)),

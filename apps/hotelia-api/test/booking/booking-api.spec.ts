@@ -1,3 +1,5 @@
+import { NotificationResolver } from '../../src/components/notification/notification.resolver';
+import { NotificationService } from '../../src/components/notification/notification.service';
 import { HotelService } from '../../src/components/hotel/hotel.service';
 import { INestApplication, UnauthorizedException } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
@@ -14,6 +16,12 @@ const memberId = new Types.ObjectId();
 const bookingId = new Types.ObjectId();
 describe('Booking read API', () => {
 	let app: INestApplication;
+	const notification = {
+		notify: jest.fn(),
+		getMyNotifications: jest.fn(),
+		getUnreadNotificationCount: jest.fn(),
+		markNotificationRead: jest.fn(),
+	};
 	const storage = { findOne: jest.fn(), aggregate: jest.fn(), findById: jest.fn(), findOneAndUpdate: jest.fn() };
 	const auth = { verifyToken: jest.fn() };
 	const hotels = { getOwnerInventoryCounts: jest.fn() };
@@ -22,10 +30,12 @@ describe('Booking read API', () => {
 			imports: [GraphQLModule.forRoot({ driver: ApolloDriver, autoSchemaFile: true })],
 			providers: [
 				BookingService,
+				{ provide: NotificationService, useValue: notification },
 				BookingResolver,
+				NotificationResolver,
 				{ provide: getModelToken('Booking'), useValue: storage },
 				{ provide: getModelToken('Room'), useValue: {} },
-				{ provide: getConnectionToken(), useValue: {} },
+				{ provide: getConnectionToken(), useValue: { transaction: async (fn) => fn({}) } },
 				{ provide: HotelService, useValue: hotels },
 				{ provide: AuthService, useValue: auth },
 			],
@@ -57,6 +67,20 @@ describe('Booking read API', () => {
 		});
 	const detail = (id = String(bookingId), signedIn = true) =>
 		run('query($id:String!){getBooking(bookingId:$id){_id memberId bookingStatus totalPrice}}', { id }, signedIn);
+	it('notification queries require login and derive the receiver from authentication', async () => {
+		const query = 'query($input:NotificationsInquiry!){getMyNotifications(input:$input){list{_id} metaCounter{total}}}';
+		expect((await run(query, { input: {} }, false)).errors).toBeDefined();
+		expect((await run(query, { input: { receiverId: String(memberId) } })).errors).toBeDefined();
+		expect((await run(query, { input: { limit: 101 } })).errors).toBeDefined();
+		notification.getMyNotifications.mockResolvedValue({ list: [], metaCounter: [] });
+		expect((await run(query, { input: {} })).errors).toBeUndefined();
+		expect(notification.getMyNotifications).toHaveBeenCalledWith(
+			memberId,
+			expect.objectContaining({ page: 1, limit: 20 }),
+		);
+		expect((await run('mutation{markNotificationRead(notificationId:"bad"){_id}}', {})).errors).toBeDefined();
+	});
+
 	it('admin cancellation rejects non-admins and terminal bookings', async () => {
 		const source = 'mutation($id:String!){cancelBookingByAdmin(bookingId:$id){_id bookingStatus}}';
 		const vars = { id: String(bookingId) };
@@ -76,7 +100,7 @@ describe('Booking read API', () => {
 		expect(storage.findOneAndUpdate).toHaveBeenCalledWith(
 			{ _id: bookingId, bookingStatus: { $in: ['PENDING', 'CONFIRMED'] } },
 			{ $set: { bookingStatus: 'CANCELLED' }, $unset: { expiresAt: 1 } },
-			{ new: true, runValidators: true },
+			{ new: true, runValidators: true, session: {} },
 		);
 	});
 

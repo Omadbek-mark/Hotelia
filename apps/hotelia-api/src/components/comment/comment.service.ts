@@ -1,3 +1,5 @@
+import { NotificationService } from '../notification/notification.service';
+import { NotificationType } from '../../libs/enums/notification.enum';
 import {
 	BadRequestException,
 	ConflictException,
@@ -30,6 +32,7 @@ export class CommentService {
 		@InjectModel('Booking') private readonly bookingModel: Model<Booking>,
 		@InjectModel('Hotel') private readonly hotelModel: Model<Hotel>,
 		@InjectConnection() private readonly connection: Connection,
+		private readonly notificationService: NotificationService,
 	) {}
 
 	public async createComment(memberId: ObjectId, input: CommentInput): Promise<Comment> {
@@ -61,6 +64,12 @@ export class CommentService {
 								},
 							],
 							{ session },
+						);
+						await this.notificationService.notify(
+							NotificationType.REVIEW,
+							shapeIntoMongoObjectId(String(memberId)),
+							booking,
+							session,
 						);
 						return review;
 					},

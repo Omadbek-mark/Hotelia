@@ -1,3 +1,5 @@
+import { NotificationService } from '../notification/notification.service';
+import { NotificationType } from '../../libs/enums/notification.enum';
 import { isUUID } from 'class-validator';
 import { BookingInput } from '../../libs/dto/booking/booking.input';
 import { Room } from '../../libs/dto/room/room';
@@ -26,6 +28,7 @@ export class BookingService {
 		@InjectModel('Room') private readonly roomModel: Model<Room>,
 		@InjectConnection() private readonly connection: Connection,
 		private readonly hotelService: HotelService,
+		private readonly notificationService: NotificationService,
 	) {}
 
 	public async createBooking(memberId: Types.ObjectId, input: BookingInput): Promise<Booking> {
@@ -96,6 +99,7 @@ export class BookingService {
 						],
 						{ session },
 					);
+					await this.notificationService.notify(NotificationType.BOOKING_CREATED, memberId, booking, session);
 					return booking;
 				},
 				{ readConcern: { level: 'snapshot' }, writeConcern: { w: 'majority' }, readPreference: 'primary' },
@@ -144,6 +148,7 @@ export class BookingService {
 				.exec();
 			if (!result)
 				throw new ConflictException('Only an unexpired pending booking with a non-past check-in can be confirmed');
+			await this.notificationService.notify(NotificationType.BOOKING_CONFIRMED, ownerId, result, session);
 			return result;
 		});
 	}
@@ -159,26 +164,29 @@ export class BookingService {
 			if (memberType !== MemberType.HOTEL_OWNER) throw new NotFoundException(Message.NO_DATA_FOUND);
 			await this.hotelService.getOwnerHotel(memberId, booking.hotelId);
 		}
-		return this.cancelPendingOrConfirmedBooking(bookingId);
+		return this.cancelPendingOrConfirmedBooking(bookingId, memberId);
 	}
 
-	public async cancelBookingByAdmin(bookingId: Types.ObjectId): Promise<Booking> {
+	public async cancelBookingByAdmin(bookingId: Types.ObjectId, memberId: Types.ObjectId): Promise<Booking> {
 		if (!(await this.bookingModel.findById(bookingId).lean().exec()))
 			throw new NotFoundException(Message.NO_DATA_FOUND);
-		return this.cancelPendingOrConfirmedBooking(bookingId);
+		return this.cancelPendingOrConfirmedBooking(bookingId, memberId);
 	}
 
-	private async cancelPendingOrConfirmedBooking(bookingId: Types.ObjectId): Promise<Booking> {
-		// Cancellation only releases inventory. The atomic status filter prevents overwriting completion.
-		const result = await this.bookingModel
-			.findOneAndUpdate(
-				{ _id: bookingId, bookingStatus: { $in: [BookingStatus.PENDING, BookingStatus.CONFIRMED] } },
-				{ $set: { bookingStatus: BookingStatus.CANCELLED }, $unset: { expiresAt: 1 } },
-				{ new: true, runValidators: true },
-			)
-			.exec();
-		if (!result) throw new ConflictException('Only pending or confirmed bookings can be cancelled');
-		return result;
+	private async cancelPendingOrConfirmedBooking(bookingId: Types.ObjectId, memberId: Types.ObjectId): Promise<Booking> {
+		// The status filter prevents overwriting completion; notification shares the transaction.
+		return this.connection.transaction(async (session) => {
+			const result = await this.bookingModel
+				.findOneAndUpdate(
+					{ _id: bookingId, bookingStatus: { $in: [BookingStatus.PENDING, BookingStatus.CONFIRMED] } },
+					{ $set: { bookingStatus: BookingStatus.CANCELLED }, $unset: { expiresAt: 1 } },
+					{ new: true, runValidators: true, session },
+				)
+				.exec();
+			if (!result) throw new ConflictException('Only pending or confirmed bookings can be cancelled');
+			await this.notificationService.notify(NotificationType.BOOKING_CANCELLED, memberId, result, session);
+			return result;
+		});
 	}
 
 	public async completeBooking(ownerId: Types.ObjectId, bookingId: Types.ObjectId): Promise<Booking> {
