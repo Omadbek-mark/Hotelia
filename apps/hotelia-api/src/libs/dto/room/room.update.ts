@@ -101,3 +101,14 @@ export class RoomUpdate {
 	@Field(() => RoomStatus, { nullable: true })
 	roomStatus?: RoomStatus;
 }
+
+@InputType()
+export class AdminRoomUpdate {
+	@IsMongoId()
+	@Field(() => String)
+	_id!: string;
+
+	@IsIn([RoomStatus.ACTIVE, RoomStatus.PAUSED])
+	@Field(() => RoomStatus)
+	roomStatus!: RoomStatus;
+}

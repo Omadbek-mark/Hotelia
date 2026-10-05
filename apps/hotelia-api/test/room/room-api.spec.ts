@@ -98,6 +98,27 @@ describe('Room GraphQL API', () => {
 				},
 			},
 		);
+	it('admin room status mutation validates roles and only allows active or paused', async () => {
+		const source = 'mutation($input:AdminRoomUpdate!){updateRoomByAdmin(input:$input){_id}}';
+		const input = { _id: String(roomId), roomStatus: 'PAUSED' };
+		expect((await run(source, { input }, false)).errors).toBeDefined();
+		for (const memberType of ['USER', 'HOTEL_OWNER']) {
+			auth.verifyToken.mockResolvedValue({ _id: memberId, memberType });
+			expect((await run(source, { input }, true)).errors).toBeDefined();
+		}
+		auth.verifyToken.mockResolvedValue({ _id: memberId, memberType: 'ADMIN' });
+		for (const change of [{ roomStatus: 'DELETE' }, { roomStatus: null }, { _id: 'bad' }, { roomPrice: 1 }])
+			expect((await run(source, { input: { ...input, ...change } }, true)).errors).toBeDefined();
+		expect(storage.findOneAndUpdate).not.toHaveBeenCalled();
+		storage.findOneAndUpdate.mockReturnValue({ exec: async () => ({ _id: roomId }) });
+		expect((await run(source, { input }, true)).errors).toBeUndefined();
+		expect(storage.findOneAndUpdate).toHaveBeenCalledWith(
+			{ _id: roomId, roomStatus: { $in: ['ACTIVE', 'PAUSED'] } },
+			{ $set: { roomStatus: 'PAUSED' } },
+			{ new: true, runValidators: true },
+		);
+	});
+
 	it('admin reads require ADMIN and apply validated filters without owner scope', async () => {
 		const list = 'query($input:AllRoomsInquiry!){getAllRoomsByAdmin(input:$input){list{_id} metaCounter{total}}}';
 		const detail = 'query($id:String!){getRoomByAdmin(roomId:$id){_id}}';
