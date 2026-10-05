@@ -1,3 +1,5 @@
+import { graphql } from 'graphql';
+import { AuthService } from '../../src/components/auth/auth.service';
 import { Test } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
 import { MongooseModule } from '@nestjs/mongoose';
@@ -170,6 +172,38 @@ integration('Booking transactions against real MongoDB', () => {
 			expect(schema.getMutationType()!.getFields()).toHaveProperty('createBooking');
 			expect(schema.getMutationType()!.getFields()).toHaveProperty('imageUploader');
 			expect(schema.getMutationType()!.getFields()).not.toHaveProperty('createProperty');
+			const run = (source: string, variables = {}, signedIn = false) =>
+				graphql({
+					schema,
+					source,
+					variableValues: variables,
+					contextValue: { req: { headers: signedIn ? { authorization: 'Bearer test' } : {} } },
+				});
+			const mutation = 'mutation($input:BoConfigInput!){saveBoConfig(input:$input){_id value configStatus}}';
+			const input = { configKey: 'ANNOUNCEMENT', value: ' Welcome ', configStatus: 'PAUSED' };
+			expect((await run(mutation, { input })).errors).toBeDefined();
+			const verify = jest.spyOn(app.get(AuthService), 'verifyToken');
+			for (const memberType of [MemberType.USER, MemberType.HOTEL_OWNER]) {
+				verify.mockResolvedValue({ _id: guestId, memberType } as any);
+				expect((await run(mutation, { input }, true)).errors).toBeDefined();
+				expect((await run('{getAllBoConfigsByAdmin{_id}}', {}, true)).errors).toBeDefined();
+			}
+			verify.mockResolvedValue({ _id: guestId, memberType: MemberType.ADMIN } as any);
+			for (const change of [{ value: '  ' }, { configKey: 'SECRET' }, { configStatus: null }])
+				expect((await run(mutation, { input: { ...input, ...change } }, true)).errors).toBeDefined();
+			const created = await run(mutation, { input }, true);
+			expect(created.errors).toBeUndefined();
+			expect(created.data?.saveBoConfig).toMatchObject({ value: 'Welcome' });
+			expect((await run('{getBoConfigs{_id}}')).data?.getBoConfigs).toEqual([]);
+			const updated = await run(
+				mutation,
+				{ input: { ...input, configStatus: 'ACTIVE', value: 'New announcement' } },
+				true,
+			);
+			expect(updated.errors).toBeUndefined();
+			expect((updated.data?.saveBoConfig as any)._id).toBe((created.data?.saveBoConfig as any)._id);
+			expect((await run('{getBoConfigs{value}}')).data?.getBoConfigs).toEqual([{ value: 'New announcement' }]);
+			expect((await run('{getAllBoConfigsByAdmin{_id}}', {}, true)).data?.getAllBoConfigsByAdmin).toHaveLength(1);
 		} finally {
 			await app.close();
 		}
