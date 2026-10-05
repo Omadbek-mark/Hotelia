@@ -464,7 +464,7 @@ describe('getHotel GraphQL', () => {
 			},
 		});
 		expect((await runList({ sort: 'MOST_POPULAR' })).errors?.[0].originalError).toBe(failure);
-		expect(storage.aggregate.mock.calls[0][0][1].$sort).toEqual({ hotelViews: -1, _id: -1 });
+		expect(storage.aggregate.mock.calls[0][0][1].$sort).toEqual({ hotelRank: -1, hotelViews: -1, _id: -1 });
 	});
 	it('returns an ACTIVE hotel to a guest without modifying views', async () => {
 		storage.findOne.mockReturnValue({

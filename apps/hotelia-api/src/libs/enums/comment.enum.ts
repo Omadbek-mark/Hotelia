@@ -12,7 +12,6 @@ export enum CommentGroup {
 	HOTEL = 'HOTEL',
 	MEMBER = 'MEMBER',
 	ARTICLE = 'ARTICLE',
-	PROPERTY = 'PROPERTY',
 }
 registerEnumType(CommentGroup, {
 	name: 'CommentGroup',

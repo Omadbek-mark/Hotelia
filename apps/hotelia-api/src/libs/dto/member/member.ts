@@ -1,109 +1,104 @@
-import { Field, Int, ObjectType } from "@nestjs/graphql";
-import * as mongoose from "mongoose";
-import { MemberAuthType, MemberStatus, MemberType } from "../../enums/member.enum";
-import { MeLiked } from "../like/like";
-import { MeFollowed } from "../follow/follow";
-
-
+import { Field, Int, ObjectType } from '@nestjs/graphql';
+import * as mongoose from 'mongoose';
+import { MemberAuthType, MemberStatus, MemberType } from '../../enums/member.enum';
+import { MeLiked } from '../like/like';
+import { MeFollowed } from '../follow/follow';
 
 @ObjectType()
 export class Member {
-  @Field(() => String)
-  _id!: mongoose.ObjectId;
+	@Field(() => String)
+	_id!: mongoose.ObjectId;
 
-  @Field(() => MemberType)
-  memberType!: MemberType;
+	@Field(() => MemberType)
+	memberType!: MemberType;
 
-  @Field(() => MemberStatus)
-  memberStatus!: MemberStatus;
-  
-  @Field(() => MemberAuthType)
-  memberAuthType!: MemberAuthType;
+	@Field(() => MemberStatus)
+	memberStatus!: MemberStatus;
 
-  @Field(() => String)
-  memberEmail!: string;
+	@Field(() => MemberAuthType)
+	memberAuthType!: MemberAuthType;
 
-  @Field(() => String, { nullable: true })
-  memberPhone?: string;
+	@Field(() => String)
+	memberEmail!: string;
 
-  @Field(() => String)
-  memberNick!: string;
+	@Field(() => String, { nullable: true })
+	memberPhone?: string;
 
-  memberPassword!: string;
+	@Field(() => String)
+	memberNick!: string;
 
-  @Field(() => String, {nullable: true})
-  memberFullName?: string;
+	memberPassword!: string;
 
-  @Field(() => String)
-  memberImage!: string;
+	@Field(() => String, { nullable: true })
+	memberFullName?: string;
 
-  @Field(() => String, {nullable: true})
-  memberAddress?: string;
+	@Field(() => String)
+	memberImage!: string;
 
-  @Field(() => String, {nullable: true})
-  memberDesc?: string;
+	@Field(() => String, { nullable: true })
+	memberAddress?: string;
 
-  @Field(() => Int, { defaultValue: 0 })
-  memberHotels: number = 0;
+	@Field(() => String, { nullable: true })
+	memberDesc?: string;
 
-  @Field(() => Int)
-  memberProperties!: number;
+	@Field(() => Int, { defaultValue: 0 })
+	memberHotels: number = 0;
 
-  @Field(() => Int)
-  memberArticles!: number;
+	@Field(() => Int)
+	memberArticles!: number;
 
-  @Field(() => Int)
-  memberFollowers!: number;
+	@Field(() => Int)
+	memberFollowers!: number;
 
-  @Field(() => Int)
-  memberFollowings!: number;
+	@Field(() => Int)
+	memberFollowings!: number;
 
-  @Field(() => Int)
-  memberPoints!: number;
+	@Field(() => Int)
+	memberPoints!: number;
 
-  @Field(() => Int)
-  memberLikes!: number;
+	@Field(() => Int)
+	memberLikes!: number;
 
-  @Field(() => Int)
-  memberViews!: number;
+	@Field(() => Int)
+	memberViews!: number;
 
-  @Field(() => Int)
-  memberComments!: number;
+	@Field(() => Int)
+	memberComments!: number;
 
-  @Field(() => Int)
-  memberRank!: number;
+	@Field(() => Int)
+	memberRank!: number;
 
-  @Field(() => Int)
-  memberWarnings!: number;
+	@Field(() => Int)
+	memberWarnings!: number;
 
-  @Field(() => Int)
-  memberBlocks!: number;
+	@Field(() => Int)
+	memberBlocks!: number;
 
-  @Field(() => Date, {nullable: true})
-  deletedAt?: Date;
+	@Field(() => Date, { nullable: true })
+	deletedAt?: Date;
 
-  @Field(() => Date)
-  createdAt!: Date;
+	@Field(() => Date)
+	createdAt!: Date;
 
-  @Field(() => Date)
-  updatedAt!: Date;
+	@Field(() => Date)
+	updatedAt!: Date;
 
-  @Field(() => String, { nullable: true })
-  accessToken?: string;
-  @Field(() => String, { nullable: true })
-  refreshToken?: string;
+	@Field(() => String, { nullable: true })
+	accessToken?: string;
+	@Field(() => String, { nullable: true })
+	refreshToken?: string;
 
-  // Request-only identity; never exposed in GraphQL or stored in Member.
-  authSessionId?: string;
-  toObject: any;
+	// Request-only identity; never exposed in GraphQL or stored in Member.
+	authSessionId?: string;
+	toObject: any;
 
-  /** from aggregation */
+	/** from aggregation */
 
-  @Field(() => [MeLiked], { nullable: true })
-  meLiked?: MeLiked[];
+	@Field(() => [MeLiked], { nullable: true })
+	meLiked?: MeLiked[];
 
-  @Field(() => [MeFollowed], { nullable: true })
-  meFollowed?: MeFollowed[];
+	@Field(() => [MeFollowed], { nullable: true })
+	meFollowed?: MeFollowed[];
 }
 
 @ObjectType()

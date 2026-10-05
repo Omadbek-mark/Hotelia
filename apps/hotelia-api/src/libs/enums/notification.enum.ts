@@ -25,7 +25,6 @@ registerEnumType(NotificationStatus, {
 export enum NotificationGroup {
 	MEMBER = 'MEMBER',
 	ARTICLE = 'ARTICLE',
-	PROPERTY = 'PROPERTY', // Legacy: remove with Property migration.
 	HOTEL = 'HOTEL',
 	BOOKING = 'BOOKING',
 }

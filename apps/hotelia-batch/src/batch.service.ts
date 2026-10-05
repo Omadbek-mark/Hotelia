@@ -1,73 +1,61 @@
 import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Member } from 'apps/hotelia-api/src/libs/dto/member/member';
-import { Property } from 'apps/hotelia-api/src/libs/dto/property/property';
-import { MemberStatus, MemberType } from 'apps/hotelia-api/src/libs/enums/member.enum';
-import { PropertyStatus } from 'apps/hotelia-api/src/libs/enums/property.enum';
+import { Member } from '../../hotelia-api/src/libs/dto/member/member';
+import { Hotel } from '../../hotelia-api/src/libs/dto/hotel/hotel';
+import { MemberStatus, MemberType } from '../../hotelia-api/src/libs/enums/member.enum';
+import { HotelStatus } from '../../hotelia-api/src/libs/enums/hotel.enum';
 import { Model } from 'mongoose';
 
 @Injectable()
 export class BatchService {
 	constructor(
-		@InjectModel('Property') private readonly propertyModel: Model<Property>,
+		@InjectModel('Hotel') private readonly hotelModel: Model<Hotel>,
 		@InjectModel('Member') private readonly memberModel: Model<Member>,
 	) {}
 
 	getHello(): string {
-		return 'Welcome Nestar Batch server!';
+		return 'Welcome Hotelia Batch server!';
 	}
 
-	public async batchRollback(): Promise<void> {
-		await this.propertyModel
+	public async batchTopHotels(): Promise<void> {
+		// Compute from current counters atomically per document; preserve updatedAt.
+		await this.hotelModel
 			.updateMany(
-				{
-					propertyStatus: PropertyStatus.ACTIVE,
-				},
-				{ propertyRank: 0 },
+				{ hotelStatus: HotelStatus.ACTIVE },
+				[
+					{
+						$set: {
+							hotelRank: {
+								$add: [{ $multiply: [{ $ifNull: ['$hotelLikes', 0] }, 2] }, { $ifNull: ['$hotelViews', 0] }],
+							},
+						},
+					},
+				],
+				{ timestamps: false },
 			)
 			.exec();
+	}
 
+	public async batchTopOwners(): Promise<void> {
 		await this.memberModel
 			.updateMany(
-				{
-					memberStatus: MemberStatus.ACTIVE,
-					memberType: MemberType.HOTEL_OWNER,
-				},
-				{ memberRank: 0 },
+				{ memberType: MemberType.HOTEL_OWNER, memberStatus: MemberStatus.ACTIVE },
+				[
+					{
+						$set: {
+							memberRank: {
+								$add: [
+									{ $multiply: [{ $ifNull: ['$memberHotels', 0] }, 4] },
+									{ $multiply: [{ $ifNull: ['$memberArticles', 0] }, 3] },
+									{ $multiply: [{ $ifNull: ['$memberLikes', 0] }, 2] },
+									{ $ifNull: ['$memberViews', 0] },
+								],
+							},
+						},
+					},
+				],
+				{ timestamps: false },
 			)
 			.exec();
-	}
-
-	public async batchTopProperties(): Promise<void> {
-		const properties: Property[] = await this.propertyModel
-			.find({
-				propertyStatus: PropertyStatus.ACTIVE,
-				propertyRank: 0,
-			})
-			.exec();
-
-		const promisedList = properties.map(async (ele: Property) => {
-			const { _id, propertyLikes, propertyViews } = ele;
-			const rank = propertyLikes * 2 + propertyViews * 1;
-			return await this.propertyModel.findByIdAndUpdate(_id, { propertyRank: rank });
-		});
-		await Promise.all(promisedList);
-	}
-
-	public async batchTopAgents(): Promise<void> {
-		const agents: Member[] = await this.memberModel
-			.find({
-				memberType: MemberType.HOTEL_OWNER,
-				memberStatus: MemberStatus.ACTIVE,
-				memberRank: 0,
-			})
-			.exec();
-
-		const promisedList = agents.map(async (ele: Member) => {
-			const { _id, memberProperties, memberLikes, memberArticles, memberViews } = ele;
-			const rank = memberProperties * 4 + memberArticles * 3 + memberLikes * 2 + memberViews * 1;
-			return await this.memberModel.findByIdAndUpdate(_id, { memberRank: rank });
-		});
-		await Promise.all(promisedList);
 	}
 }

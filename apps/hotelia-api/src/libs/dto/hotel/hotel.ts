@@ -57,6 +57,9 @@ export class Hotel {
 	@Field(() => Int)
 	hotelReviews!: number;
 
+	@Field(() => Float, { nullable: true })
+	hotelRank?: number;
+
 	@Field(() => Int)
 	hotelViews!: number;
 
