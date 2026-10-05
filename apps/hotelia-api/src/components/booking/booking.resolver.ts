@@ -19,6 +19,13 @@ export class BookingResolver {
 
 	@Roles(MemberType.ADMIN)
 	@UseGuards(RolesGuard)
+	@Mutation(() => Booking)
+	public async cancelBookingByAdmin(@Args('bookingId') input: string): Promise<Booking> {
+		return this.bookingService.cancelBookingByAdmin(shapeIntoMongoObjectId(input));
+	}
+
+	@Roles(MemberType.ADMIN)
+	@UseGuards(RolesGuard)
 	@Query(() => Bookings)
 	public async getAllBookingsByAdmin(
 		@Args('input', new ValidationPipe({ transform: true, whitelist: true, forbidNonWhitelisted: true }))

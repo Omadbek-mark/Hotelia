@@ -14,7 +14,7 @@ const memberId = new Types.ObjectId();
 const bookingId = new Types.ObjectId();
 describe('Booking read API', () => {
 	let app: INestApplication;
-	const storage = { findOne: jest.fn(), aggregate: jest.fn() };
+	const storage = { findOne: jest.fn(), aggregate: jest.fn(), findById: jest.fn(), findOneAndUpdate: jest.fn() };
 	const auth = { verifyToken: jest.fn() };
 	const hotels = { getOwnerInventoryCounts: jest.fn() };
 	beforeAll(async () => {
@@ -57,6 +57,29 @@ describe('Booking read API', () => {
 		});
 	const detail = (id = String(bookingId), signedIn = true) =>
 		run('query($id:String!){getBooking(bookingId:$id){_id memberId bookingStatus totalPrice}}', { id }, signedIn);
+	it('admin cancellation rejects non-admins and terminal bookings', async () => {
+		const source = 'mutation($id:String!){cancelBookingByAdmin(bookingId:$id){_id bookingStatus}}';
+		const vars = { id: String(bookingId) };
+		expect((await run(source, vars, false)).errors).toBeDefined();
+		for (const memberType of ['USER', 'HOTEL_OWNER']) {
+			auth.verifyToken.mockResolvedValue({ _id: memberId, memberType });
+			expect((await run(source, vars)).errors).toBeDefined();
+		}
+		expect(storage.findById).not.toHaveBeenCalled();
+		auth.verifyToken.mockResolvedValue({ _id: memberId, memberType: 'ADMIN' });
+		expect((await run(source, { id: 'bad' })).errors).toBeDefined();
+		storage.findById.mockReturnValue({ lean: () => ({ exec: async () => ({ _id: bookingId }) }) });
+		storage.findOneAndUpdate.mockReturnValue({ exec: async () => null });
+		expect((await run(source, vars)).errors).toBeDefined();
+		storage.findOneAndUpdate.mockReturnValue({ exec: async () => ({ _id: bookingId, bookingStatus: 'CANCELLED' }) });
+		expect((await run(source, vars)).errors).toBeUndefined();
+		expect(storage.findOneAndUpdate).toHaveBeenCalledWith(
+			{ _id: bookingId, bookingStatus: { $in: ['PENDING', 'CONFIRMED'] } },
+			{ $set: { bookingStatus: 'CANCELLED' }, $unset: { expiresAt: 1 } },
+			{ new: true, runValidators: true },
+		);
+	});
+
 	it('admin reads require ADMIN and apply validated filters without owner scope', async () => {
 		const list = 'query($input:AllBookingsInquiry!){getAllBookingsByAdmin(input:$input){list{_id} metaCounter{total}}}';
 		const detail = 'query($id:String!){getBookingByAdmin(bookingId:$id){_id}}';

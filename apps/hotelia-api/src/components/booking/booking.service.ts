@@ -159,6 +159,16 @@ export class BookingService {
 			if (memberType !== MemberType.HOTEL_OWNER) throw new NotFoundException(Message.NO_DATA_FOUND);
 			await this.hotelService.getOwnerHotel(memberId, booking.hotelId);
 		}
+		return this.cancelPendingOrConfirmedBooking(bookingId);
+	}
+
+	public async cancelBookingByAdmin(bookingId: Types.ObjectId): Promise<Booking> {
+		if (!(await this.bookingModel.findById(bookingId).lean().exec()))
+			throw new NotFoundException(Message.NO_DATA_FOUND);
+		return this.cancelPendingOrConfirmedBooking(bookingId);
+	}
+
+	private async cancelPendingOrConfirmedBooking(bookingId: Types.ObjectId): Promise<Booking> {
 		// Cancellation only releases inventory. The atomic status filter prevents overwriting completion.
 		const result = await this.bookingModel
 			.findOneAndUpdate(

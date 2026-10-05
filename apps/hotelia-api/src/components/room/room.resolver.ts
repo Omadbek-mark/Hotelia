@@ -3,7 +3,7 @@ import { Args, Mutation, Query, Resolver } from '@nestjs/graphql';
 import { Types } from 'mongoose';
 import { Room, Rooms } from '../../libs/dto/room/room';
 import { OwnerRoomsInquiry, RoomsInquiry, AllRoomsInquiry } from '../../libs/dto/room/room.inquiry';
-import { RoomUpdate } from '../../libs/dto/room/room.update';
+import { AdminRoomUpdate, RoomUpdate } from '../../libs/dto/room/room.update';
 import { shapeIntoMongoObjectId } from '../../libs/config';
 import { RoomInput } from '../../libs/dto/room/room.input';
 import { MemberType } from '../../libs/enums/member.enum';
@@ -16,6 +16,16 @@ import { AvailableRooms, AvailableRoomsInquiry } from '../../libs/dto/room/room.
 @Resolver(() => Room)
 export class RoomResolver {
 	constructor(private readonly roomService: RoomService) {}
+
+	@Roles(MemberType.ADMIN)
+	@UseGuards(RolesGuard)
+	@Mutation(() => Room)
+	public async updateRoomByAdmin(
+		@Args('input', new ValidationPipe({ transform: true, whitelist: true, forbidNonWhitelisted: true }))
+		input: AdminRoomUpdate,
+	): Promise<Room> {
+		return this.roomService.updateRoomByAdmin(input);
+	}
 
 	@Roles(MemberType.ADMIN)
 	@UseGuards(RolesGuard)

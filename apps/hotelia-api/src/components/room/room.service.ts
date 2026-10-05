@@ -8,7 +8,7 @@ import { InjectConnection, InjectModel } from '@nestjs/mongoose';
 import { Error as MongooseError, Connection, FilterQuery, Model, Types } from 'mongoose';
 import { Room, Rooms } from '../../libs/dto/room/room';
 import { OwnerRoomsInquiry, RoomsInquiry, AllRoomsInquiry } from '../../libs/dto/room/room.inquiry';
-import { RoomUpdate } from '../../libs/dto/room/room.update';
+import { AdminRoomUpdate, RoomUpdate } from '../../libs/dto/room/room.update';
 import { RoomInput } from '../../libs/dto/room/room.input';
 import { shapeIntoMongoObjectId } from '../../libs/config';
 import { RoomSort, RoomStatus } from '../../libs/enums/room.enum';
@@ -23,6 +23,20 @@ export class RoomService {
 		@InjectConnection() private readonly connection: Connection,
 		@InjectModel('Booking') private readonly bookingModel: Model<Booking>,
 	) {}
+
+	public async updateRoomByAdmin(input: AdminRoomUpdate): Promise<Room> {
+		if (![RoomStatus.ACTIVE, RoomStatus.PAUSED].includes(input.roomStatus))
+			throw new BadRequestException(Message.NOT_ALLOWED_REQUEST);
+		const room = await this.roomModel
+			.findOneAndUpdate(
+				{ _id: shapeIntoMongoObjectId(input._id), roomStatus: { $in: [RoomStatus.ACTIVE, RoomStatus.PAUSED] } },
+				{ $set: { roomStatus: input.roomStatus } },
+				{ new: true, runValidators: true },
+			)
+			.exec();
+		if (!room) throw new NotFoundException(Message.NO_DATA_FOUND);
+		return room;
+	}
 
 	public async getAllRoomsByAdmin(input: AllRoomsInquiry): Promise<Rooms> {
 		const match: FilterQuery<Room> = {};
