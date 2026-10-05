@@ -13,7 +13,7 @@ import { AdminMemberUpdate, MemberUpdate } from '../../libs/dto/member/member.up
 import { getSerialForImage, shapeIntoMongoObjectId, validMimeTypes } from '../../libs/config';
 import { WithoutGuard } from '../auth/guards/without.guard';
 import { GraphQLUpload, FileUpload } from 'graphql-upload';
-import { saveImage } from '../../libs/upload';
+import { saveImage, saveImages } from '../../libs/upload';
 import { Message } from '../../libs/enums/common.enum';
 
 @Resolver()
@@ -109,10 +109,10 @@ export class MemberResolver {
   @Mutation((returns) => String)
   public async imageUploader(
     @Args({ name: 'file', type: () => GraphQLUpload })
-  { createReadStream, filename, mimetype }: FileUpload,
+  file: Promise<FileUpload>,
   @Args('target') target: String,
   ): Promise<string> {
-    return await saveImage({ createReadStream, filename, mimetype } as FileUpload, String(target));
+    return await saveImage(await file, String(target));
   }
 
   @UseGuards(AuthGuard)
@@ -122,10 +122,6 @@ export class MemberResolver {
   files: Promise<FileUpload>[],
   @Args('target') target: String,
   ): Promise<string[]> {
-    const uploadedImages: string[] = [];
-    for (const file of files) {
-      uploadedImages.push(await saveImage(await file, String(target)));
-    }
-    return uploadedImages;
+    return await saveImages(files, String(target));
   }
 }
