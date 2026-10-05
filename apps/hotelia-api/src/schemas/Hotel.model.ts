@@ -99,6 +99,8 @@ const HotelSchema = new Schema(
 			required: true,
 		},
 
+		hotelRank: { type: Number, default: 0, min: 0 },
+
 		hotelViews: {
 			type: Number,
 			default: 0,

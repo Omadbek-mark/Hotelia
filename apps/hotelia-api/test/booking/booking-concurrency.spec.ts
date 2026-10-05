@@ -1,3 +1,4 @@
+import { BatchService } from '../../../hotelia-batch/src/batch.service';
 import { randomUUID } from 'crypto';
 import { createConnection, Connection, Model, Types } from 'mongoose';
 import { MongoMemoryReplSet } from 'mongodb-memory-server';
@@ -59,7 +60,7 @@ integration('Booking transactions against real MongoDB', () => {
 		const memberService = new MemberService(members, {} as any, {} as any, {} as any, {} as any);
 		articleService = new BoardArticleService(articles, memberService, {} as any, likeService, connection);
 		followService = new FollowService(follows, memberService, members, connection);
-		commentService = new CommentService(comments, memberService, {} as any, {} as any, bookings, hotels, connection);
+		commentService = new CommentService(comments, memberService, {} as any, bookings, hotels, connection);
 		hotelService = new HotelService(connection, memberService, {} as any, hotels, bookings);
 		roomService = new RoomService(rooms, hotelService, connection, bookings);
 		bookingService = new BookingService(bookings, rooms, connection, hotelService);
@@ -129,6 +130,27 @@ integration('Booking transactions against real MongoDB', () => {
 		articleTitle: '[Seoul] guide',
 		articleContent: 'Useful travel advice',
 	};
+	it('hotel ranking batch recalculates current counters without resetting ranks or changing timestamps', async () => {
+		await hotels.updateOne({ _id: hotelId }, { $set: { hotelLikes: 3, hotelViews: 7 } });
+		await members.updateOne(
+			{ _id: ownerId },
+			{ $set: { memberHotels: 2, memberArticles: 1, memberLikes: 4, memberViews: 5 } },
+		);
+		const before = (await hotels.findById(hotelId))!.updatedAt;
+		const batch = new BatchService(hotels, members);
+		await batch.batchTopHotels();
+		await batch.batchTopOwners();
+		expect((await hotels.findById(hotelId))!.hotelRank).toBe(13);
+		expect((await hotels.findById(hotelId))!.updatedAt).toEqual(before);
+		expect((await members.findById(ownerId))!.memberRank).toBe(24);
+		await hotels.updateOne({ _id: hotelId }, { $set: { hotelLikes: 1 } });
+		await batch.batchTopHotels();
+		expect((await hotels.findById(hotelId))!.hotelRank).toBe(9);
+		await hotels.updateOne({ _id: hotelId }, { $set: { hotelStatus: 'PAUSED', hotelLikes: 100 } });
+		await batch.batchTopHotels();
+		expect((await hotels.findById(hotelId))!.hotelRank).toBe(9);
+	});
+
 	it('owner reviews scope hotels before pagination and retain paused hotel history', async () => {
 		const foreign = await hotels.create({
 			...(await hotels.findById(hotelId))!.toObject(),

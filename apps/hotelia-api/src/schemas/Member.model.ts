@@ -2,136 +2,130 @@ import { Schema } from 'mongoose';
 import { MemberAuthType, MemberStatus, MemberType } from '../libs/enums/member.enum';
 
 const MemberSchema = new Schema(
-  {
-    memberType: {
-      type: String,
-      enum: MemberType,
-      default: MemberType.USER,
-    },
+	{
+		memberType: {
+			type: String,
+			enum: MemberType,
+			default: MemberType.USER,
+		},
 
-    memberStatus: {
-      type: String,
-      enum: MemberStatus,
-      default: MemberStatus.ACTIVE,
-    },
+		memberStatus: {
+			type: String,
+			enum: MemberStatus,
+			default: MemberStatus.ACTIVE,
+		},
 
-    memberAuthType: {
-      type: String,
-      enum: MemberAuthType,
-      default: MemberAuthType.EMAIL,
-    },
+		memberAuthType: {
+			type: String,
+			enum: MemberAuthType,
+			default: MemberAuthType.EMAIL,
+		},
 
-    memberEmail: {
-      type: String,
-      required: true,
-      unique: true,
-      trim: true,
-      lowercase: true,
-    },
+		memberEmail: {
+			type: String,
+			required: true,
+			unique: true,
+			trim: true,
+			lowercase: true,
+		},
 
-    memberPhone: {
-      type: String,
-      index: { unique: true, sparse: true },
-      trim: true,
-    },
+		memberPhone: {
+			type: String,
+			index: { unique: true, sparse: true },
+			trim: true,
+		},
 
-    memberNick: {
-      type: String,
-      index: { unique: true, sparse: true },
-      required: true,
-    },
+		memberNick: {
+			type: String,
+			index: { unique: true, sparse: true },
+			required: true,
+		},
 
-    memberPassword: {
-      type: String,
-      select: false,
-      required: true,
-    },
+		memberPassword: {
+			type: String,
+			select: false,
+			required: true,
+		},
 
-    memberFullName: {
-      type: String,
-    },
+		memberFullName: {
+			type: String,
+		},
 
-    memberImage: {
-      type: String,
-      default: '',
-    },
+		memberImage: {
+			type: String,
+			default: '',
+		},
 
-    memberAddress: {
-      type: String,
-    },
+		memberAddress: {
+			type: String,
+		},
 
-    memberDesc: {
-      type: String,
-    },
+		memberDesc: {
+			type: String,
+		},
 
-    memberHotels: {
-      type: Number,
-      default: 0,
-      min: 0,
-      validate: Number.isInteger,
-    },
+		memberHotels: {
+			type: Number,
+			default: 0,
+			min: 0,
+			validate: Number.isInteger,
+		},
 
-    // Legacy Property module counter; separate from Hotel inventory.
-    memberProperties: {
-      type: Number,
-      default: 0,
-    },
+		memberArticles: {
+			type: Number,
+			default: 0,
+		},
 
-    memberArticles: {
-      type: Number,
-      default: 0,
-    },
-    
-    memberFollowers: {
-      type: Number,
-      default: 0,
-    },
+		memberFollowers: {
+			type: Number,
+			default: 0,
+		},
 
-    memberFollowings: {
-      type: Number,
-      default: 0,
-    },
+		memberFollowings: {
+			type: Number,
+			default: 0,
+		},
 
-    memberPoints: {
-      type: Number,
-      default: 0,
-    },
+		memberPoints: {
+			type: Number,
+			default: 0,
+		},
 
-    memberLikes: {
-      type: Number,
-      default: 0,
-    },
+		memberLikes: {
+			type: Number,
+			default: 0,
+		},
 
-    memberViews: {
-      type: Number,
-      default: 0,
-    },
+		memberViews: {
+			type: Number,
+			default: 0,
+		},
 
-    memberComments: {
-      type: Number,
-      default: 0,
-    },
+		memberComments: {
+			type: Number,
+			default: 0,
+		},
 
-    memberRank: {
-      type: Number,
-      default: 0,
-    },
+		memberRank: {
+			type: Number,
+			default: 0,
+		},
 
-    memberWarnings: {
-      type: Number,
-      default: 0,
-    },
+		memberWarnings: {
+			type: Number,
+			default: 0,
+		},
 
-    memberBlocks: {
-      type: Number,
-      default: 0,
-    },
+		memberBlocks: {
+			type: Number,
+			default: 0,
+		},
 
-    deletedAt: {
-      type: Date,
-    },
-  },
-  { timestamps: true, collection: 'members'},
+		deletedAt: {
+			type: Date,
+		},
+	},
+	{ timestamps: true, collection: 'members' },
 );
 
 export default MemberSchema;

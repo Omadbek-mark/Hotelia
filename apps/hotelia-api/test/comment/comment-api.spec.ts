@@ -71,6 +71,7 @@ describe('Hotel reviews through comment API', () => {
 	it('requires authentication and validates hotel review fields', async () => {
 		expect((await create(base, false)).errors).toBeDefined();
 		for (const change of [
+			{ commentGroup: 'PROPERTY' },
 			{ rating: undefined },
 			{ rating: 0 },
 			{ rating: 6 },

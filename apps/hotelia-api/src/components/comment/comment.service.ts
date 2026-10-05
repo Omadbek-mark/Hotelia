@@ -12,7 +12,6 @@ import { Hotel } from '../../libs/dto/hotel/hotel';
 import { BookingStatus } from '../../libs/enums/booking.enum';
 import { HotelStatus } from '../../libs/enums/hotel.enum';
 import { MemberService } from '../member/member.service';
-import { PropertyService } from '../property/property.service';
 import { BoardArticleService } from '../board-article/board-article.service';
 import { CommentInput, CommentsInquiry, OwnerReviewsInquiry } from '../../libs/dto/comment/comment.input';
 import { Direction, Message } from '../../libs/enums/common.enum';
@@ -27,7 +26,6 @@ export class CommentService {
 	constructor(
 		@InjectModel('Comment') private readonly commentModel: Model<Comment>,
 		private readonly memberService: MemberService,
-		private readonly propertyService: PropertyService,
 		private readonly boardArticleService: BoardArticleService,
 		@InjectModel('Booking') private readonly bookingModel: Model<Booking>,
 		@InjectModel('Hotel') private readonly hotelModel: Model<Hotel>,
@@ -91,13 +89,6 @@ export class CommentService {
 		}
 
 		switch (input.commentGroup) {
-			case CommentGroup.PROPERTY:
-				await this.propertyService.propertyStatsEditor({
-					_id: input.commentRefId,
-					targetKey: 'propertyComments',
-					modifier: 1,
-				});
-				break;
 			case CommentGroup.ARTICLE:
 				await this.boardArticleService.boardArticleStatsEditor({
 					_id: input.commentRefId,
@@ -169,7 +160,7 @@ export class CommentService {
 		const match: T = {
 			commentRefId,
 			commentStatus: CommentStatus.ACTIVE,
-			commentGroup: commentGroup ?? { $ne: CommentGroup.HOTEL },
+			commentGroup: commentGroup ?? { $in: [CommentGroup.MEMBER, CommentGroup.ARTICLE] },
 		};
 		const sort: T = {
 			[input?.sort ?? 'createdAt']: input?.direction ?? Direction.DESC,
@@ -254,13 +245,6 @@ export class CommentService {
 		if (!result) throw new InternalServerErrorException(Message.REMOVE_FAILED);
 
 		switch (result.commentGroup) {
-			case CommentGroup.PROPERTY:
-				await this.propertyService.propertyStatsEditor({
-					_id: result.commentRefId,
-					targetKey: 'propertyComments',
-					modifier: -1,
-				});
-				break;
 			case CommentGroup.ARTICLE:
 				await this.boardArticleService.boardArticleStatsEditor({
 					_id: result.commentRefId,
