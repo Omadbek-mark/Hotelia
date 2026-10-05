@@ -24,6 +24,10 @@ import { RoomType } from '../../enums/room.enum';
 @InputType()
 export class HotelSearch {
 	@ValidateIf((_, value) => value !== undefined)
+	@IsMongoId()
+	@Field(() => String, { nullable: true })
+	ownerId?: string;
+	@ValidateIf((_, value) => value !== undefined)
 	@IsString()
 	@Matches(/^\d{4}-\d{2}-\d{2}$/)
 	@Field(() => String, { nullable: true })

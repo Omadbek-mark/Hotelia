@@ -157,6 +157,7 @@ export class HotelService {
 
 	public async getHotels(input: HotelsInquiry): Promise<Hotels> {
 		const match: FilterQuery<Hotel> = { hotelStatus: HotelStatus.ACTIVE };
+		if (input.search?.ownerId) match.ownerId = shapeIntoMongoObjectId(input.search.ownerId);
 		return await this.getHotelList(match, input);
 	}
 

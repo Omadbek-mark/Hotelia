@@ -553,6 +553,18 @@ describe('getHotel GraphQL', () => {
 		expect(result.errors).toBeUndefined();
 		expect((result.data?.getHotel as any).memberData).toBeNull();
 	});
+	it('filters public hotels by owner without exposing paused hotels', async () => {
+		const ownerId = new Types.ObjectId();
+		storage.aggregate.mockReturnValue({ exec: async () => [{ list: [], metaCounter: [] }] });
+		const result = await runList({ page: 1, limit: 6, sort: 'NEWEST', search: { ownerId: ownerId.toHexString() } });
+		expect(result.errors).toBeUndefined();
+		expect(storage.aggregate.mock.calls[0][0][0].$match).toMatchObject({ ownerId, hotelStatus: HotelStatus.ACTIVE });
+	});
+	it('rejects invalid public owner filters', async () => {
+		const result = await runList({ page: 1, limit: 6, sort: 'NEWEST', search: { ownerId: 'invalid' } });
+		expect(result.errors).toBeDefined();
+		expect(storage.aggregate).not.toHaveBeenCalled();
+	});
 });
 
 describe('public owner projection', () => {
