@@ -1,3 +1,9 @@
+import { Test } from '@nestjs/testing';
+import { ConfigService } from '@nestjs/config';
+import { MongooseModule } from '@nestjs/mongoose';
+import { GraphQLModule, GraphQLSchemaHost } from '@nestjs/graphql';
+import { ApolloDriver } from '@nestjs/apollo';
+import { ComponentsModule } from '../../src/components/components.module';
 import NotificationSchema from '../../src/schemas/Notification.model';
 import { NotificationService } from '../../src/components/notification/notification.service';
 import { BatchService } from '../../../hotelia-batch/src/batch.service';
@@ -144,6 +150,31 @@ integration('Booking transactions against real MongoDB', () => {
 		articleTitle: '[Seoul] guide',
 		articleContent: 'Useful travel advice',
 	};
+	it('initializes all API component modules and their GraphQL schema together', async () => {
+		const module = await Test.createTestingModule({
+			imports: [
+				MongooseModule.forRoot(repl.getUri(), { dbName: 'hotelia_module_test' }),
+				GraphQLModule.forRoot({ driver: ApolloDriver, autoSchemaFile: true }),
+				ComponentsModule,
+			],
+		})
+			.overrideProvider(ConfigService)
+			.useValue({ get: () => 'test-only-secret' })
+			.compile();
+		const app = module.createNestApplication();
+		app.useLogger(false);
+		try {
+			await app.init();
+			const schema = app.get(GraphQLSchemaHost).schema;
+			expect(schema.getQueryType()!.getFields()).toHaveProperty('getMyNotifications');
+			expect(schema.getMutationType()!.getFields()).toHaveProperty('createBooking');
+			expect(schema.getMutationType()!.getFields()).toHaveProperty('imageUploader');
+			expect(schema.getMutationType()!.getFields()).not.toHaveProperty('createProperty');
+		} finally {
+			await app.close();
+		}
+	});
+
 	it('notifications follow booking events, remain private and are not duplicated by retries', async () => {
 		const request = input();
 		const booking = await bookingService.createBooking(guestId, request);
