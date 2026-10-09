@@ -19,7 +19,7 @@ describe('getHotel GraphQL', () => {
 	const storage = { findOne: jest.fn(), findOneAndUpdate: jest.fn(), aggregate: jest.fn() };
 	const bookings = { exists: jest.fn() };
 	const members = { getHotelOwner: jest.fn(), memberStatsEditor: jest.fn() };
-	const views = { recordView: jest.fn() };
+	const views = { recordView: jest.fn(), getVisitedHotels: jest.fn() };
 	const likes = { attachFavoriteStatus: jest.fn(), setHotelFavorite: jest.fn(), getFavoriteHotels: jest.fn() };
 	const session = {};
 	const connection = { transaction: jest.fn(async (callback) => callback(session)) };
@@ -89,6 +89,22 @@ describe('getHotel GraphQL', () => {
 			{ _id: String(id), hotelStatus: 'PAUSED' },
 		],
 	] as const;
+	it('protects visited history and uses only the authenticated member identity', async () => {
+		const source = 'query($input:VisitedInquiry!){getVisited(input:$input){list{_id isFavorite} metaCounter{total}}}';
+		expect((await adminRun(source, {}, false)).errors).toBeDefined();
+		expect(views.getVisitedHotels).not.toHaveBeenCalled();
+		auth.verifyToken.mockResolvedValue({ _id: id, memberType: 'USER' });
+		views.getVisitedHotels.mockResolvedValue({ list: [{ _id: id }], metaCounter: [{ total: 1 }] });
+		const result = await adminRun(source, { page: 2, limit: 6 });
+		expect(result.errors).toBeUndefined();
+		expect(views.getVisitedHotels).toHaveBeenCalledWith(id, { page: 2, limit: 6 });
+		expect(likes.attachFavoriteStatus).toHaveBeenCalledWith([{ _id: id, isFavorite: false }], id);
+		expect((result.data?.getVisited as any).list[0].isFavorite).toBe(false);
+		views.getVisitedHotels.mockClear();
+		for (const input of [{ page: 0 }, { page: 1.2 }, { limit: 101 }, { memberId: String(id) }])
+			expect((await adminRun(source, input)).errors).toBeDefined();
+		expect(views.getVisitedHotels).not.toHaveBeenCalled();
+	});
 	it('denies all hotel admin operations to guests, users and owners', async () => {
 		for (const role of ['USER', 'HOTEL_OWNER', 'GUEST']) {
 			auth.verifyToken.mockResolvedValue({ _id: id, memberType: role });
@@ -457,14 +473,14 @@ describe('getHotel GraphQL', () => {
 		expect(facet.list[3].$unwind.preserveNullAndEmptyArrays).toBe(true);
 	});
 	it('accepts MOST_LIKED and ranks the full active catalog by like count before pagination', async () => {
-        storage.aggregate.mockReturnValue({ exec: async () => [{ list: [], metaCounter: [] }] });
-        const result = await runList({ page: 1, limit: 3, sort: 'MOST_LIKED', search: {} });
-        expect(result.errors).toBeUndefined();
-        const pipeline = storage.aggregate.mock.calls[0][0];
-        expect(pipeline[0].$match.hotelStatus).toBe(HotelStatus.ACTIVE);
-        expect(pipeline[1].$sort).toEqual({ hotelLikes: -1, _id: -1 });
-        expect(pipeline.find(stage => stage.$facet).$facet.list[1]).toEqual({ $limit: 3 });
-    });
+		storage.aggregate.mockReturnValue({ exec: async () => [{ list: [], metaCounter: [] }] });
+		const result = await runList({ page: 1, limit: 3, sort: 'MOST_LIKED', search: {} });
+		expect(result.errors).toBeUndefined();
+		const pipeline = storage.aggregate.mock.calls[0][0];
+		expect(pipeline[0].$match.hotelStatus).toBe(HotelStatus.ACTIVE);
+		expect(pipeline[1].$sort).toEqual({ hotelLikes: -1, _id: -1 });
+		expect(pipeline.find((stage) => stage.$facet).$facet.list[1]).toEqual({ $limit: 3 });
+	});
 	it('sorts popularity by views and propagates database failures', async () => {
 		const failure = new Error('database unavailable');
 		storage.aggregate.mockReturnValue({

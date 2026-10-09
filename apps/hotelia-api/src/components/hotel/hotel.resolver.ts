@@ -16,12 +16,15 @@ import { LikeService } from '../like/like.service';
 import { AuthGuard } from '../auth/guards/auth.guard';
 import { FavoriteResult } from '../../libs/dto/like/favorite-result';
 import { FavoritesInquiry } from '../../libs/dto/like/favorites.inquiry';
+import { ViewService } from '../view/view.service';
+import { VisitedInquiry } from '../../libs/dto/view/visited.inquiry';
 
 @Resolver(() => Hotel)
 export class HotelResolver {
 	constructor(
 		private readonly hotelService: HotelService,
 		private readonly likeService: LikeService,
+		private readonly viewService: ViewService,
 	) {}
 
 	@Roles(MemberType.ADMIN)
@@ -77,6 +80,18 @@ export class HotelResolver {
 		input: FavoritesInquiry,
 	): Promise<Hotels> {
 		return await this.likeService.getFavoriteHotels(memberId, input);
+	}
+
+	@UseGuards(AuthGuard)
+	@Query(() => Hotels)
+	public async getVisited(
+		@AuthMember('_id') memberId: Types.ObjectId,
+		@Args('input', new ValidationPipe({ transform: true, whitelist: true, forbidNonWhitelisted: true }))
+		input: VisitedInquiry,
+	): Promise<Hotels> {
+		const result = await this.viewService.getVisitedHotels(memberId, input);
+		await this.likeService.attachFavoriteStatus(result.list, memberId);
+		return result;
 	}
 
 	@Roles(MemberType.HOTEL_OWNER)
