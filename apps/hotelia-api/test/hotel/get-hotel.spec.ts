@@ -456,6 +456,15 @@ describe('getHotel GraphQL', () => {
 		});
 		expect(facet.list[3].$unwind.preserveNullAndEmptyArrays).toBe(true);
 	});
+	it('accepts MOST_LIKED and ranks the full active catalog by like count before pagination', async () => {
+        storage.aggregate.mockReturnValue({ exec: async () => [{ list: [], metaCounter: [] }] });
+        const result = await runList({ page: 1, limit: 3, sort: 'MOST_LIKED', search: {} });
+        expect(result.errors).toBeUndefined();
+        const pipeline = storage.aggregate.mock.calls[0][0];
+        expect(pipeline[0].$match.hotelStatus).toBe(HotelStatus.ACTIVE);
+        expect(pipeline[1].$sort).toEqual({ hotelLikes: -1, _id: -1 });
+        expect(pipeline.find(stage => stage.$facet).$facet.list[1]).toEqual({ $limit: 3 });
+    });
 	it('sorts popularity by views and propagates database failures', async () => {
 		const failure = new Error('database unavailable');
 		storage.aggregate.mockReturnValue({

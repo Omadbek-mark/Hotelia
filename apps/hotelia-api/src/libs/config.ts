@@ -1,7 +1,7 @@
 import { BadRequestException } from '@nestjs/common';
 import { ObjectId } from 'bson';
 
-export const availableHotelOwnerSorts = ['createdAt', 'updatedAt', 'memberLikes', 'memberViews', 'memberRank'];
+export const availableHotelOwnerSorts = ['memberFollowers', 'createdAt', 'updatedAt', 'memberLikes', 'memberViews', 'memberRank'];
 export const availableMemberSorts = ['createdAt', 'updatedAt', 'memberLikes', 'memberViews'];
 
 export const availableBoardArticleSorts = ['createdAt', 'updatedAt', 'articleLikes', 'articleViews'];

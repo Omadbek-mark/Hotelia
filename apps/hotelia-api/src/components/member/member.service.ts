@@ -16,7 +16,7 @@ import { LikeGroup } from '../../libs/enums/like.enum';
 import { LikeInput } from '../../libs/dto/like/like.input';
 import { LikeService } from '../like/like.service';
 import { Follower, Following, MeFollowed } from '../../libs/dto/follow/follow';
-import { lookupAuthMemberLiked } from '../../libs/config';
+import { lookupAuthMemberLiked, lookupAuthMemberFollowed } from '../../libs/config';
 
 @Injectable()
 export class MemberService {
@@ -168,7 +168,7 @@ export class MemberService {
   public async getHotelOwners(memberId: ObjectId, input: HotelOwnersInquiry): Promise<Members> {
 		const { text } = input.search;
 		const match: T = { memberType: MemberType.HOTEL_OWNER, memberStatus: MemberStatus.ACTIVE };
-		const sort: T = { [input?.sort ?? 'createdAt']: input?.direction ?? Direction.DESC };
+		const sort: T = { [input?.sort ?? 'createdAt']: input?.direction ?? Direction.DESC, _id: input?.direction ?? Direction.DESC };
 
         if (text) match.memberNick = { $regex: escapeSearchText(text), $options: 'i' };
 		console.log('match:', match);
@@ -183,6 +183,7 @@ export class MemberService {
               { $skip: (input.page - 1) * input.limit },
               { $limit: input.limit },
               lookupAuthMemberLiked(memberId),
+              ...(memberId ? [lookupAuthMemberFollowed({ followerId: memberId, followingId: '$_id' })] : []),
             ],
 						metaCounter: [{ $count: 'total' }],
 					},
