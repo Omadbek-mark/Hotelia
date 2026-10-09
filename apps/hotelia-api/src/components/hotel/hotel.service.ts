@@ -257,6 +257,7 @@ export class HotelService {
 			[HotelSort.NEWEST]: { createdAt: -1, _id: -1 },
 			[HotelSort.RATING]: { hotelRating: -1, _id: -1 },
 			[HotelSort.MOST_POPULAR]: { hotelRank: -1, hotelViews: -1, _id: -1 },
+			[HotelSort.MOST_LIKED]: { hotelLikes: -1, _id: -1 },
 		};
 		const result = await this.hotelModel
 			.aggregate<Hotels>([
