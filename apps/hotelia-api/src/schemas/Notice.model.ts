@@ -21,6 +21,7 @@ const NoticeSchema = new Schema(
 		},
 
 		requestId: { type: String },
+		noticeRevision: { type: Number, default: 0, min: 0 },
 		noticeResponse: { type: String, maxlength: 2000 },
 		respondedAt: { type: Date },
 		noticeContent: {
