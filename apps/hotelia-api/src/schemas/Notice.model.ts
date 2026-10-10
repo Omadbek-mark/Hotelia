@@ -20,6 +20,9 @@ const NoticeSchema = new Schema(
 			required: true,
 		},
 
+		requestId: { type: String },
+		noticeResponse: { type: String, maxlength: 2000 },
+		respondedAt: { type: Date },
 		noticeContent: {
 			type: String,
 			required: true,
@@ -33,5 +36,7 @@ const NoticeSchema = new Schema(
 	},
 	{ timestamps: true, collection: 'notices' },
 );
+
+NoticeSchema.index({ memberId: 1, requestId: 1 }, { unique: true, partialFilterExpression: { requestId: { $type: 'string' } } });
 
 export default NoticeSchema;
