@@ -49,6 +49,9 @@ describe('Booking read API', () => {
 		jest.resetAllMocks();
 		auth.verifyToken.mockResolvedValue({ _id: memberId, memberType: 'USER' });
 		storage.findOne.mockReturnValue({
+			session: () => ({
+				lean: () => ({ exec: async () => ({ _id: bookingId, memberId, bookingStatus: 'PENDING', totalPrice: 500 }) }),
+			}),
 			lean: () => ({ exec: async () => ({ _id: bookingId, memberId, bookingStatus: 'CANCELLED', totalPrice: 500 }) }),
 		});
 		storage.aggregate.mockImplementation((pipeline) => ({
@@ -99,7 +102,16 @@ describe('Booking read API', () => {
 		expect((await run(source, vars)).errors).toBeUndefined();
 		expect(storage.findOneAndUpdate).toHaveBeenCalledWith(
 			{ _id: bookingId, bookingStatus: { $in: ['PENDING', 'CONFIRMED'] } },
-			{ $set: { bookingStatus: 'CANCELLED' }, $unset: { expiresAt: 1 } },
+			{
+				$set: {
+					bookingStatus: 'CANCELLED',
+					cancellationFee: 0,
+					refundAmount: 500,
+					cancelledAt: expect.any(Date),
+					cancelledBy: memberId,
+				},
+				$unset: { expiresAt: 1 },
+			},
 			{ new: true, runValidators: true, session: {} },
 		);
 	});
@@ -219,6 +231,9 @@ describe('Booking read API', () => {
 		expect(storage.findOne).not.toHaveBeenCalled();
 	});
 	it.each([
+		{ paymentMethod: 'BANK_CARD' },
+		{ paymentMethod: 'UNKNOWN' },
+		{ paymentStatus: 'PAID' },
 		{ requestId: 'invalid' },
 		{ rooms: 0 },
 		{ guests: 1.5 },

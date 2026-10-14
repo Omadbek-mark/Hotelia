@@ -2,6 +2,14 @@ import { BadRequestException } from '@nestjs/common';
 
 export const BOOKING_CURRENCY = 'USD';
 
+// Integer cents: round 5% to the nearest cent, with half-cents rounded up.
+export function cancellationAmounts(totalPrice: number, chargeFee: boolean) {
+	if (!isUsdAmount(totalPrice)) throw new BadRequestException('Invalid booking total');
+	const cents = BigInt(Math.round(totalPrice * 100));
+	const fee = chargeFee ? (cents * 5n + 50n) / 100n : 0n;
+	return { cancellationFee: Number(fee) / 100, refundAmount: Number(cents - fee) / 100 };
+}
+
 export function isUsdAmount(value: unknown): value is number {
 	if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0) return false;
 	if (!/^\d+(\.\d{1,2})?$/.test(String(value))) return false;

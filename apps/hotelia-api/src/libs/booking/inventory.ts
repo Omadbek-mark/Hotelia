@@ -7,7 +7,10 @@ export function inventoryBookingFilter(now: Date) {
 	return {
 		$or: [
 			{ bookingStatus: BookingStatus.CONFIRMED },
-			{ bookingStatus: BookingStatus.PENDING, $or: [{ expiresAt: { $gt: now } }, { expiresAt: null }] },
+			{
+				bookingStatus: BookingStatus.PENDING,
+				$or: [{ freeCancellationUntil: { $type: 'date' } }, { expiresAt: { $gt: now } }, { expiresAt: null }],
+			},
 		],
 	};
 }

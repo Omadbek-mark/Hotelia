@@ -1,3 +1,5 @@
+import 'reflect-metadata';
+import { ValidationPipe } from '@nestjs/common';
 import { Readable } from 'stream';
 import { mkdir, readdir, readFile, unlink } from 'fs/promises';
 import type { FileUpload } from 'graphql-upload';
@@ -23,11 +25,39 @@ describe('Image uploads', () => {
 		const created = (await readdir('uploads/room')).filter((name) => !before.includes(name));
 		await Promise.all(created.map((name) => unlink(`uploads/room/${name}`)));
 	});
+	it('passes upload argument through the global validation pipe without constructing a Promise', async () => {
+		const metatype = Reflect.getMetadata('design:paramtypes', MemberResolver.prototype, 'imageUploader')[0];
+		expect(metatype).toBe(Object);
+		const upload = file();
+		const validated = await new ValidationPipe().transform(Promise.resolve(upload), { type: 'body', metatype });
+		const resolver = new MemberResolver({} as any);
+		const url = await resolver.imageUploader(validated, 'room');
+		expect(await readFile(url)).toEqual(png);
+	});
 	it('awaits the GraphQL upload promise and supports room images', async () => {
 		const resolver = new MemberResolver({} as any);
 		const url = await resolver.imageUploader(Promise.resolve(file()), 'room');
 		expect(url).toMatch(/^uploads\/room\/.+\.png$/);
 		expect(await readFile(url)).toEqual(png);
+	});
+	it('accepts WebP signatures split across stream chunks', async () => {
+		const content = Buffer.from('RIFF0000WEBPVP8 data');
+		const upload = file(content, 'image/webp');
+		upload.createReadStream = (() => Readable.from([content.subarray(0, 5), content.subarray(5, 10), content.subarray(10)])) as any;
+		const url = await saveImage(upload, 'room');
+		expect(url).toMatch(/\.webp$/);
+		expect(await readFile(url)).toEqual(content);
+	});
+	it('accepts streamed images larger than the old 15 MB limit', async () => {
+		const content = Buffer.concat([png, Buffer.alloc(16_000_000)]);
+		const url = await saveImage(file(content), 'room');
+		const saved = await readFile(url);
+		expect(saved.length).toBe(content.length);
+		expect(saved.subarray(0, png.length)).toEqual(png);
+	});
+	it('rejects mismatched WebP content and removes partial files', async () => {
+		await expect(saveImage(file(Buffer.from('RIFF0000FAKEdata'), 'image/webp'), 'room')).rejects.toMatchObject({ status: 400 });
+		expect(await readdir('uploads/room')).toEqual(before);
 	});
 	it('rejects fake image content and removes partial files', async () => {
 		await expect(saveImage(file(Buffer.from('<html>invalid</html>')), 'room')).rejects.toMatchObject({ status: 400 });

@@ -29,6 +29,7 @@ describe('getHotel GraphQL', () => {
 			imports: [GraphQLModule.forRoot({ driver: ApolloDriver, autoSchemaFile: true })],
 			providers: [
 				HotelService,
+				{ provide: NotificationService, useValue: { notifyInventoryCreated: jest.fn() } },
 				HotelResolver,
 				{ provide: getConnectionToken(), useValue: connection },
 				{ provide: ViewService, useValue: views },
@@ -74,6 +75,16 @@ describe('getHotel GraphQL', () => {
 			variableValues: { input },
 			contextValue: { req: { headers: {} } },
 		});
+	it('returns public distinct active Central Asian locations without loading hotel details', async () => {
+		storage.aggregate.mockReturnValue({ exec: async () => [{city:'Khiva',country:'Uzbekistan'}] });
+		const result = await graphql({ schema: app.get(GraphQLSchemaHost).schema, source: '{getHotelLocations{city country}}' });
+		expect(result.errors).toBeUndefined();
+		expect(result.data?.getHotelLocations).toEqual([{city:'Khiva',country:'Uzbekistan'}]);
+		const pipeline = storage.aggregate.mock.calls[0][0];
+		expect(pipeline[0].$match).toEqual({hotelStatus: HotelStatus.ACTIVE, hotelCountry: {$in:['Uzbekistan','Kazakhstan','Kyrgyzstan']}});
+		expect(pipeline).toContainEqual({$group:{_id:{city:'$city',country:'$country'}}});
+		expect(pipeline).toContainEqual({$match:{city:{$ne:''}}});
+	});
 	const adminRun = (source: string, input: unknown, signedIn = true) =>
 		graphql({
 			schema: app.get(GraphQLSchemaHost).schema,
@@ -125,9 +136,24 @@ describe('getHotel GraphQL', () => {
 		expect(storage.findOne).toHaveBeenCalledWith({ _id: id });
 		expect(views.recordView).not.toHaveBeenCalled();
 	});
+	it('admin deletion uses the booking-safe transaction and decrements the owner count', async () => {
+		const ownerId = new Types.ObjectId();
+		auth.verifyToken.mockResolvedValue({_id:id,memberType:'ADMIN'});
+		storage.findOne.mockReturnValue({lean:()=>({exec:async()=>({_id:id,ownerId})})});
+		storage.findOneAndUpdate.mockReturnValue({exec:async()=>({_id:id,ownerId,hotelStatus:'DELETE'})});
+		const result = await adminRun(adminQueries[2][0],{_id:String(id),hotelStatus:'DELETE'});
+		expect(result.errors).toBeUndefined();
+		expect(connection.transaction).toHaveBeenCalledTimes(1);
+		expect(bookings.exists).toHaveBeenCalledWith(expect.objectContaining({hotelId:id}));
+		expect(members.memberStatsEditor).toHaveBeenCalledWith({_id:ownerId,targetKey:'memberHotels',modifier:-1},session,true);
+		bookings.exists.mockReturnValue({session:()=>({exec:async()=>({_id:id})})});
+		members.memberStatsEditor.mockClear();
+		expect((await adminRun(adminQueries[2][0],{_id:String(id),hotelStatus:'DELETE'})).errors?.[0].message).toBe('Hotel has active bookings');
+		expect(members.memberStatsEditor).not.toHaveBeenCalled();
+	});
 	it('allows admin status changes only on nondeleted hotels and rejects forged update fields', async () => {
 		auth.verifyToken.mockResolvedValue({ _id: id, memberType: 'ADMIN' });
-		for (const change of [{ hotelStatus: 'DELETE' }, { ownerId: String(id) }, { hotelLikes: 50 }, { _id: 'bad' }]) {
+		for (const change of [{ hotelStatus: 'INVALID' }, { ownerId: String(id) }, { hotelLikes: 50 }, { _id: 'bad' }]) {
 			expect(
 				(await adminRun(adminQueries[2][0], { _id: String(id), hotelStatus: 'PAUSED', ...change })).errors,
 			).toBeDefined();
@@ -268,6 +294,34 @@ describe('getHotel GraphQL', () => {
 			expect(pipeline[2].$facet.metaCounter).toEqual([{ $count: 'total' }]);
 		},
 	);
+	it('sorts discovery by views before applying the page limit', async () => {
+		storage.aggregate.mockReturnValue({ exec: async () => [{ list: [], metaCounter: [] }] });
+		const result = await runList({ page: 1, limit: 4, sort: 'MOST_VIEWED' });
+		expect(result.errors).toBeUndefined();
+		const pipeline = storage.aggregate.mock.calls[0][0];
+		expect(pipeline.find((stage) => stage.$sort)?.$sort).toEqual({ hotelViews: -1, _id: -1 });
+		expect(pipeline.findIndex((stage) => stage.$sort)).toBeLessThan(pipeline.findIndex((stage) => stage.$facet));
+		expect(pipeline.some((stage) => stage.$lookup?.from === 'comments')).toBe(false);
+	});
+	it('ranks popular stays by likes plus active hotel comments across the full result set', async () => {
+		storage.aggregate.mockReturnValue({ exec: async () => [{ list: [], metaCounter: [] }] });
+		const result = await runList({ page: 1, limit: 4, sort: 'MOST_POPULAR' });
+		expect(result.errors).toBeUndefined();
+		const pipeline = storage.aggregate.mock.calls[0][0];
+		const commentLookup = pipeline.find((stage) => stage.$lookup?.from === 'comments').$lookup;
+		expect(commentLookup.localField).toBe('_id');
+		expect(commentLookup.foreignField).toBe('commentRefId');
+		expect(commentLookup.pipeline).toEqual([
+			{ $match: { commentGroup: 'HOTEL', commentStatus: 'ACTIVE' } },
+			{ $count: 'total' },
+		]);
+		expect(pipeline.find((stage) => stage.$set?.hotelRank)?.$set.hotelRank).toEqual({ $add: [
+			{ $ifNull: ['$hotelLikes', 0] },
+			{ $ifNull: [{ $arrayElemAt: ['$discoveryComments.total', 0] }, 0] },
+		] });
+		expect(pipeline.find((stage) => stage.$sort)?.$sort).toEqual({ hotelRank: -1, hotelLikes: -1, _id: -1 });
+		expect(pipeline.findIndex((stage) => stage.$sort)).toBeLessThan(pipeline.findIndex((stage) => stage.$facet));
+	});
 	it.each([
 		{ hotelStatus: 'DELETE' },
 		{ hotelStatus: null },
@@ -431,6 +485,19 @@ describe('getHotel GraphQL', () => {
 		expect((await runList(input)).errors).toBeDefined();
 		expect(storage.aggregate).not.toHaveBeenCalled();
 	});
+	it('filters multiple cities with exact case-insensitive matching and rejects invalid arrays', async () => {
+		storage.aggregate.mockReturnValue({ exec: async () => [{ list: [], metaCounter: [] }] });
+		expect((await runList({ search: { cities: [' Tashkent ', 'Almaty'] } })).errors).toBeUndefined();
+		const patterns = storage.aggregate.mock.calls[0][0][0].$match.hotelCity.$in;
+		expect(patterns[0].test('tashkent')).toBe(true);
+		expect(patterns[0].test('Tashkent region')).toBe(false);
+		expect(patterns[1].test('ALMATY')).toBe(true);
+		for (const cities of [[''], ['   '], ['Almaty','Almaty'], Array(10).fill('Tashkent')]) {
+			storage.aggregate.mockClear();
+			expect((await runList({ search: { cities } })).errors).toBeDefined();
+			expect(storage.aggregate).not.toHaveBeenCalled();
+		}
+	});
 	it('combines literal text and destination with all amenities, rating and type', async () => {
 		storage.aggregate.mockReturnValue({ exec: async () => [{ list: [], metaCounter: [{ total: 25 }] }] });
 		const result = await runList({
@@ -489,7 +556,7 @@ describe('getHotel GraphQL', () => {
 			},
 		});
 		expect((await runList({ sort: 'MOST_POPULAR' })).errors?.[0].originalError).toBe(failure);
-		expect(storage.aggregate.mock.calls[0][0][1].$sort).toEqual({ hotelRank: -1, hotelViews: -1, _id: -1 });
+		expect(storage.aggregate.mock.calls[0][0].find((stage) => stage.$sort).$sort).toEqual({ hotelRank: -1, hotelLikes: -1, _id: -1 });
 	});
 	it('returns an ACTIVE hotel to a guest without modifying views', async () => {
 		storage.findOne.mockReturnValue({
@@ -617,3 +684,4 @@ describe('public owner projection', () => {
 		expect(result).not.toHaveProperty('accessToken');
 	});
 });
+import { NotificationService } from '../../src/components/notification/notification.service';

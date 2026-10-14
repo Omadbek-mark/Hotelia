@@ -14,6 +14,7 @@ import { shapeIntoMongoObjectId } from '../../libs/config';
 import { RoomSort, RoomStatus } from '../../libs/enums/room.enum';
 import { Message } from '../../libs/enums/common.enum';
 import { HotelService } from '../hotel/hotel.service';
+import { NotificationService } from '../notification/notification.service';
 
 @Injectable()
 export class RoomService {
@@ -22,9 +23,11 @@ export class RoomService {
 		private readonly hotelService: HotelService,
 		@InjectConnection() private readonly connection: Connection,
 		@InjectModel('Booking') private readonly bookingModel: Model<Booking>,
+		private readonly notificationService: NotificationService,
 	) {}
 
 	public async updateRoomByAdmin(input: AdminRoomUpdate): Promise<Room> {
+		if (input.roomStatus === RoomStatus.DELETE) return this.deleteRoom(null, shapeIntoMongoObjectId(input._id), true);
 		if (![RoomStatus.ACTIVE, RoomStatus.PAUSED].includes(input.roomStatus))
 			throw new BadRequestException(Message.NOT_ALLOWED_REQUEST);
 		const room = await this.roomModel
@@ -183,10 +186,11 @@ export class RoomService {
 		}
 	}
 
-	public async deleteRoom(memberId: Types.ObjectId, roomId: Types.ObjectId): Promise<Room> {
-		const room = await this.getOwnerRoom(memberId, roomId);
+	public async deleteRoom(memberId: Types.ObjectId | null, roomId: Types.ObjectId, byAdmin = false): Promise<Room> {
+		const room = byAdmin ? await this.getRoomByAdmin(roomId) : await this.getOwnerRoom(memberId!, roomId);
 		return await this.connection.transaction(async (session) => {
-			await this.hotelService.lockBookingHotel(room.hotelId, session, memberId);
+			if (byAdmin) await this.hotelService.lockBookingHotel(room.hotelId, session, undefined, true);
+			else await this.hotelService.lockBookingHotel(room.hotelId, session, memberId!);
 			const booked = await this.bookingModel
 				.exists({ roomId, ...inventoryBookingFilter(new Date()) })
 				.session(session)
@@ -207,22 +211,31 @@ export class RoomService {
 	public async createRoom(memberId: Types.ObjectId, input: RoomInput): Promise<Room> {
 		const hotelId = shapeIntoMongoObjectId(input.hotelId);
 		// Reuse the owner/status check; preparing rooms in a PAUSED hotel is allowed.
-		await this.hotelService.getOwnerHotel(memberId, hotelId);
+		const hotel = await this.hotelService.getOwnerHotel(memberId, hotelId);
 
 		try {
-			return await this.roomModel.create({
-				hotelId,
-				roomName: input.roomName,
-				roomDescription: input.roomDescription,
-				roomType: input.roomType,
-				roomPrice: input.roomPrice,
-				roomCapacity: input.roomCapacity,
-				roomQuantity: input.roomQuantity,
-				bedType: input.bedType,
-				roomSize: input.roomSize,
-				roomImages: input.roomImages,
-				roomAmenities: input.roomAmenities,
-				roomStatus: RoomStatus.ACTIVE,
+			return await this.connection.transaction(async (session) => {
+				const [room] = await this.roomModel.create(
+					[
+						{
+							hotelId,
+							roomName: input.roomName,
+							roomDescription: input.roomDescription,
+							roomType: input.roomType,
+							roomPrice: input.roomPrice,
+							roomCapacity: input.roomCapacity,
+							roomQuantity: input.roomQuantity,
+							bedType: input.bedType,
+							roomSize: input.roomSize,
+							roomImages: input.roomImages,
+							roomAmenities: input.roomAmenities,
+							roomStatus: RoomStatus.ACTIVE,
+						},
+					],
+					{ session },
+				);
+				await this.notificationService.notifyInventoryCreated(memberId, hotel, session, room);
+				return room;
 			});
 		} catch (error) {
 			if (error instanceof MongooseError.ValidationError) {

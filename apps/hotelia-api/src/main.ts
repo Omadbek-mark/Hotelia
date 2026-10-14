@@ -12,7 +12,7 @@ async function bootstrap() {
   app.useGlobalInterceptors(new LoggingInterceptor());
   app.enableCors({ origin: true, credentials: true });
 
-  app.use(graphqlUploadExpress({ maxFileSize: 15000000, maxFiles: 10 }));
+  app.use(graphqlUploadExpress({ maxFiles: 10 }));
   app.use('/uploads', express.static('./uploads'));
 
   app.useWebSocketAdapter(new WsAdapter(app));

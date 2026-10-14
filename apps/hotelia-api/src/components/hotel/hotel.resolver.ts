@@ -1,6 +1,6 @@
 import { UseGuards, ValidationPipe } from '@nestjs/common';
 import { Args, Mutation, Query, Resolver } from '@nestjs/graphql';
-import { Hotel, Hotels } from '../../libs/dto/hotel/hotel';
+import { Hotel, Hotels, HotelLocation } from '../../libs/dto/hotel/hotel';
 import { AllHotelsInquiry, HotelsInquiry, OwnerHotelsInquiry } from '../../libs/dto/hotel/hotel.inquiry';
 import { HotelInput } from '../../libs/dto/hotel/hotel.input';
 import { AdminHotelUpdate, HotelUpdate } from '../../libs/dto/hotel/hotel.update';
@@ -26,6 +26,11 @@ export class HotelResolver {
 		private readonly likeService: LikeService,
 		private readonly viewService: ViewService,
 	) {}
+
+	@Query(() => [HotelLocation])
+	public async getHotelLocations(): Promise<HotelLocation[]> {
+		return this.hotelService.getHotelLocations();
+	}
 
 	@Roles(MemberType.ADMIN)
 	@UseGuards(RolesGuard)

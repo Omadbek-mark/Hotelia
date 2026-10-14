@@ -10,28 +10,28 @@ const imageExtensions: Record<string, string> = {
 	'image/png': '.png',
 	'image/jpeg': '.jpg',
 	'image/jpg': '.jpg',
+	'image/webp': '.webp',
 };
 export async function saveImage(file: FileUpload, target: string): Promise<string> {
 	if (!['member', 'hotel', 'room', 'article'].includes(target)) throw new BadRequestException('Invalid image target');
 	const extension = imageExtensions[file.mimetype];
-	if (!extension) throw new BadRequestException('Please provide jpg, jpeg or png images!');
+	if (!extension) throw new BadRequestException('Please provide JPG, JPEG, PNG or WebP images!');
 	const directory = `uploads/${target}`;
 	await mkdir(directory, { recursive: true });
 	const url = `${directory}/${uuidv4()}${extension}`;
 	let header = Buffer.alloc(0);
 	let validated = false;
-	let size = 0;
 	const validation = new Transform({
 		transform(chunk: Buffer, _encoding, callback) {
-			size += chunk.length;
-			if (size > 15000000) return callback(new BadRequestException('Image exceeds 15 MB'));
 			if (validated) return callback(null, chunk);
 			header = Buffer.concat([header, chunk]);
-			if (header.length < 8) return callback();
+			if (header.length < (extension === '.webp' ? 12 : 8)) return callback();
 			const valid =
 				extension === '.png'
 					? header.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))
-					: header[0] === 255 && header[1] === 216 && header[2] === 255;
+					: extension === '.webp'
+						? header.subarray(0, 4).toString('ascii') === 'RIFF' && header.subarray(8, 12).toString('ascii') === 'WEBP'
+						: header[0] === 255 && header[1] === 216 && header[2] === 255;
 			if (!valid) return callback(new BadRequestException('Image content does not match its type'));
 			validated = true;
 			callback(null, header);

@@ -14,7 +14,7 @@ export class BatchController {
 		this.logger.debug('BATCH SERVER READY!');
 	}
 
-	@Cron('20 00 01 * * *', { name: BATCH_TOP_HOTELS, timeZone: 'Asia/Seoul' })
+	@Cron('20 00 01 * * *', { name: BATCH_TOP_HOTELS, timeZone: 'Asia/Tashkent' })
 	async batchHotels() {
 		try {
 			this.logger['context'] = BATCH_TOP_HOTELS;
@@ -25,7 +25,7 @@ export class BatchController {
 		}
 	}
 
-	@Cron('40 00 01 * * *', { name: BATCH_TOP_OWNERS, timeZone: 'Asia/Seoul' })
+	@Cron('40 00 01 * * *', { name: BATCH_TOP_OWNERS, timeZone: 'Asia/Tashkent' })
 	async batchOwners() {
 		try {
 			this.logger['context'] = BATCH_TOP_OWNERS;

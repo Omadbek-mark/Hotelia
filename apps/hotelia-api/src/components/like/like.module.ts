@@ -3,11 +3,13 @@ import { MongooseModule } from '@nestjs/mongoose';
 import LikeSchema from '../../schemas/Like.model';
 import { LikeService } from './like.service';
 import HotelSchema from '../../schemas/Hotel.model';
+import CommentSchema from '../../schemas/Comment.model';
 
 @Module({
 	imports: [
 		MongooseModule.forFeature([
 			{ name: 'Hotel', schema: HotelSchema },
+			{ name: 'Comment', schema: CommentSchema },
 			{
 				name: 'Like',
 				schema: LikeSchema,

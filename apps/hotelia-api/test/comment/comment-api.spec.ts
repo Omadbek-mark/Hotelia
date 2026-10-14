@@ -87,6 +87,12 @@ describe('Hotel reviews through comment API', () => {
 		expect((await create(base)).errors).toBeUndefined();
 		expect(service.createComment).toHaveBeenCalledWith(id, expect.objectContaining(base));
 	});
+	it('allows authenticated hotel comments without booking or rating', async () => {
+		const input = { commentGroup: 'HOTEL', commentRefId: String(id), commentContent: 'Looks beautiful' };
+		expect((await create(input, false)).errors).toBeDefined();
+		expect((await create(input)).errors).toBeUndefined();
+		expect(service.createComment).toHaveBeenCalledWith(id, expect.objectContaining(input));
+	});
 	it('keeps article comments working without review-only fields', async () => {
 		expect(
 			(await create({ commentGroup: 'ARTICLE', commentRefId: String(id), commentContent: 'Useful article' })).errors,
@@ -105,5 +111,49 @@ describe('Hotel reviews through comment API', () => {
 		const input = { page: 1, limit: 10, search: { commentGroup: 'HOTEL', commentRefId: String(id) } };
 		expect((await run(source, { ...input, limit: 101 }, false)).errors).toBeDefined();
 		expect((await run(source, input, false)).errors).toBeUndefined();
+	});
+});
+
+
+describe('Hotel comment service', () => {
+	const hotelId = new Types.ObjectId(), memberId = new Types.ObjectId();
+	let comments: any, hotels: any, bookings: any, service: CommentService;
+	beforeEach(() => {
+		comments = {
+			countDocuments: jest.fn(() => ({ session: () => ({ exec: async () => 3 }) })),
+			create: jest.fn(async (docs) => [{ _id: new Types.ObjectId(), ...docs[0] }]),
+			aggregate: jest.fn(() => ({ session: () => ({ exec: async () => [{ count: 2, rating: 4.5 }] }) })),
+		};
+		hotels = {
+			findOneAndUpdate: jest.fn(() => ({ exec: async () => ({ _id: hotelId }) })),
+			updateOne: jest.fn(() => ({ exec: async () => ({}) })),
+		};
+		bookings = { findOne: jest.fn() };
+		service = new CommentService(comments, {} as any, {} as any, bookings, hotels, { transaction: async (fn) => fn({}) } as any, {} as any);
+	});
+	const input = () => ({ commentGroup: 'HOTEL', commentRefId: hotelId, commentContent: 'Lovely place' } as any);
+	it('writes a plain authenticated comment without querying a booking or altering verified rating counts', async () => {
+		const result = await service.createComment(memberId as any, input());
+		expect(result.commentContent).toBe('Lovely place');
+		expect(result.bookingId).toBeUndefined();
+		expect(result.rating).toBeUndefined();
+		expect(bookings.findOne).not.toHaveBeenCalled();
+		expect(hotels.findOneAndUpdate.mock.calls[0][0]).toMatchObject({ hotelStatus: 'ACTIVE' });
+		expect(comments.aggregate.mock.calls[0][0][0].$match).toMatchObject({ bookingId: { $type: 'objectId' }, rating: { $gte: 1, $lte: 5 } });
+		expect(hotels.updateOne.mock.calls[0][1]).toEqual({ $set: { hotelReviews: 2, hotelRating: 4.5, hotelRank: 3 } });
+	});
+	it('rejects comments on inactive or missing hotels before writing', async () => {
+		hotels.findOneAndUpdate.mockReturnValue({ exec: async () => null });
+		await expect(service.createComment(memberId as any, input())).rejects.toMatchObject({ status: 404 });
+		expect(comments.create).not.toHaveBeenCalled();
+	});
+	it('requires both booking and rating when creating a verified review', async () => {
+		await expect(service.createComment(memberId as any, { ...input(), rating: 5 })).rejects.toMatchObject({ status: 400 });
+		await expect(service.createComment(memberId as any, { ...input(), bookingId: String(new Types.ObjectId()) })).rejects.toMatchObject({ status: 400 });
+		expect(comments.create).not.toHaveBeenCalled();
+	});
+	it('prevents adding a rating to an ordinary comment', async () => {
+		comments.findOne = jest.fn(() => ({ lean: () => ({ exec: async () => ({ ...input(), _id: new Types.ObjectId() }) }) }));
+		await expect(service.updateComment(memberId as any, { _id: new Types.ObjectId(), rating: 5 } as any)).rejects.toMatchObject({ status: 400 });
 	});
 });

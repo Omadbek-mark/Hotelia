@@ -41,6 +41,7 @@ export function roomInventoryPipeline(
 	input: Pick<AvailableRoomsInquiry, 'rooms'>,
 	stay: ReturnType<typeof getStayDates>,
 	now = new Date(),
+	excludeBookingId?: Types.ObjectId,
 ): (PipelineStage.Lookup | PipelineStage.Set | PipelineStage.Match | PipelineStage.Unset)[] {
 	return [
 		{
@@ -53,6 +54,7 @@ export function roomInventoryPipeline(
 						$match: {
 							$expr: { $eq: ['$roomId', '$$roomId'] },
 							...inventoryBookingFilter(now),
+							...(excludeBookingId ? { _id: { $ne: excludeBookingId } } : {}),
 							checkIn: { $lt: stay.checkOut },
 							checkOut: { $gt: stay.checkIn },
 						},

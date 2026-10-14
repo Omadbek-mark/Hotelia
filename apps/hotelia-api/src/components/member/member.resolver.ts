@@ -109,7 +109,8 @@ export class MemberResolver {
   @Mutation((returns) => String)
   public async imageUploader(
     @Args({ name: 'file', type: () => GraphQLUpload })
-  file: Promise<FileUpload>,
+  // Upload promises are handled by GraphQLUpload, not DTO validation.
+  file: Promise<FileUpload> | FileUpload,
   @Args('target') target: String,
   ): Promise<string> {
     return await saveImage(await file, String(target));

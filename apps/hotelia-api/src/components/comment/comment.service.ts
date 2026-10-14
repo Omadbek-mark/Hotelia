@@ -37,6 +37,16 @@ export class CommentService {
 
 	public async createComment(memberId: ObjectId, input: CommentInput): Promise<Comment> {
 		if (input.commentGroup === CommentGroup.HOTEL) {
+			if (input.bookingId === undefined && input.rating === undefined) {
+				const hotelId = shapeIntoMongoObjectId(input.commentRefId);
+				return await this.writeHotelReview(hotelId, async (session) => {
+					const [comment] = await this.commentModel.create([{
+						memberId, commentRefId: hotelId, commentGroup: CommentGroup.HOTEL,
+						commentContent: input.commentContent, commentStatus: CommentStatus.ACTIVE,
+					}], { session });
+					return comment;
+				}, true);
+			}
 			if (!Number.isInteger(input.rating) || input.rating! < 1 || input.rating! > 5 || !input.bookingId) {
 				throw new BadRequestException('Hotel reviews require a bookingId and rating from 1 to 5');
 			}
@@ -129,7 +139,10 @@ export class CommentService {
 		if (input.commentContent !== undefined) changes.commentContent = input.commentContent;
 		if (input.commentStatus !== undefined) changes.commentStatus = input.commentStatus;
 		if (current.commentGroup === CommentGroup.HOTEL) {
-			if (input.rating !== undefined) changes.rating = input.rating;
+			if (input.rating !== undefined) {
+				if (!current.bookingId) throw new BadRequestException('Ratings require a verified completed stay');
+				changes.rating = input.rating;
+			}
 			if (!Object.keys(changes).length) throw new BadRequestException(Message.BAD_REQUEST);
 			return await this.writeHotelReview(current.commentRefId, async (session) => {
 				const review = await this.commentModel
@@ -180,7 +193,7 @@ export class CommentService {
 	}
 
 	public async getOwnerReviews(memberId: ObjectId, input: OwnerReviewsInquiry): Promise<Comments> {
-		const match: T = { commentGroup: CommentGroup.HOTEL, commentStatus: CommentStatus.ACTIVE };
+		const match: T = { commentGroup: CommentGroup.HOTEL, commentStatus: CommentStatus.ACTIVE, bookingId: { $type: 'objectId' } };
 		if (input.hotelId) {
 			const hotelId = shapeIntoMongoObjectId(input.hotelId);
 			if (!(await this.hotelModel.exists({ _id: hotelId, ownerId: memberId }).exec()))
@@ -291,15 +304,18 @@ export class CommentService {
 			const result = await write(session);
 			const [stats] = await this.commentModel
 				.aggregate<{ count: number; rating: number }>([
-					{ $match: { commentRefId: hotelId, commentGroup: CommentGroup.HOTEL, commentStatus: CommentStatus.ACTIVE } },
+					{ $match: { commentRefId: hotelId, commentGroup: CommentGroup.HOTEL, commentStatus: CommentStatus.ACTIVE, bookingId: { $type: 'objectId' }, rating: { $gte: 1, $lte: 5 } } },
 					{ $group: { _id: null, count: { $sum: 1 }, rating: { $avg: '$rating' } } },
 				])
 				.session(session)
 				.exec();
+			const commentCount = await this.commentModel.countDocuments({
+				commentRefId: hotelId, commentGroup: CommentGroup.HOTEL, commentStatus: CommentStatus.ACTIVE,
+			}).session(session).exec();
 			await this.hotelModel
 				.updateOne(
 					{ _id: hotelId },
-					{ $set: { hotelReviews: stats?.count ?? 0, hotelRating: stats?.rating ?? 0 } },
+					{ $set: { hotelReviews: stats?.count ?? 0, hotelRating: stats?.rating ?? 0, hotelRank: (hotel.hotelLikes ?? 0) + commentCount } },
 					{ session, timestamps: false },
 				)
 				.exec();

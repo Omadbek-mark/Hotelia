@@ -8,6 +8,7 @@ import { AuthModule } from '../auth/auth.module';
 import { HotelResolver } from './hotel.resolver';
 import { HotelService } from './hotel.service';
 import { LikeModule } from '../like/like.module';
+import { NotificationModule } from '../notification/notification.module';
 
 @Module({
 	imports: [
@@ -22,6 +23,7 @@ import { LikeModule } from '../like/like.module';
 		MemberModule,
 		ViewModule,
 		LikeModule,
+		NotificationModule,
 	],
 	providers: [HotelResolver, HotelService],
 	exports: [HotelService],

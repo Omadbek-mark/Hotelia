@@ -24,6 +24,16 @@ import { RoomType } from '../../enums/room.enum';
 @InputType()
 export class HotelSearch {
 	@ValidateIf((_, value) => value !== undefined)
+	@IsArray()
+	@ArrayMaxSize(100)
+	@ArrayUnique()
+	@IsString({ each: true })
+	@MaxLength(100, { each: true })
+	@Matches(/\S/, { each: true })
+	@Field(() => [String], { nullable: true })
+	cities?: string[];
+
+	@ValidateIf((_, value) => value !== undefined)
 	@IsMongoId()
 	@Field(() => String, { nullable: true })
 	ownerId?: string;

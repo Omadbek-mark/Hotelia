@@ -1,6 +1,7 @@
 import { ConflictException, Injectable } from '@nestjs/common';
-import { InjectModel } from '@nestjs/mongoose';
-import { Model, Types } from 'mongoose';
+import { InjectConnection, InjectModel } from '@nestjs/mongoose';
+import { Connection, Model, Types } from 'mongoose';
+import { NotificationService } from '../notification/notification.service';
 import {
 	MyInquiriesInquiry,
 	SupportInquiryInput,
@@ -20,7 +21,11 @@ import {
 
 @Injectable()
 export class SupportService {
-	constructor(@InjectModel('Notice') private readonly notices: Model<SupportNotice>) {}
+	constructor(
+		@InjectModel('Notice') private readonly notices: Model<SupportNotice>,
+		@InjectConnection() private readonly connection: Connection,
+		private readonly notificationService: NotificationService,
+	) {}
 	async getSupportByAdmin(input: AdminSupportInquiry): Promise<AdminSupportNotices> {
 		const result = await this.list(
 			{
@@ -149,21 +154,27 @@ export class SupportService {
 		const filter = { memberId, noticeCategory: NoticeCategory.INQUIRY, requestId: input.requestId };
 		let result: any;
 		try {
-			result = await this.notices
-				.findOneAndUpdate(
-					filter,
-					{
-						$setOnInsert: {
-							...filter,
-							noticeTitle: input.noticeTitle,
-							noticeContent: input.noticeContent,
-							noticeStatus: NoticeStatus.HOLD,
+			return await this.connection.transaction(async (session) => {
+				result = await this.notices
+					.findOneAndUpdate(
+						filter,
+						{
+							$setOnInsert: {
+								...filter,
+								noticeTitle: input.noticeTitle,
+								noticeContent: input.noticeContent,
+								noticeStatus: NoticeStatus.HOLD,
+							},
 						},
-					},
-					{ upsert: true, new: true, setDefaultsOnInsert: true },
-				)
-				.lean()
-				.exec();
+						{ upsert: true, new: true, setDefaultsOnInsert: true, session },
+					)
+					.lean()
+					.exec();
+				if (!result || result.noticeTitle !== input.noticeTitle || result.noticeContent !== input.noticeContent)
+					throw new ConflictException('This request was already submitted with different content.');
+				await this.notificationService.notifySupportMessage(memberId, result, session);
+				return result;
+			});
 		} catch (error) {
 			if ((error as { code?: number }).code !== 11000) throw error;
 			result = await this.notices.findOne(filter).lean().exec();

@@ -1,6 +1,7 @@
 import { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
-import { getModelToken } from '@nestjs/mongoose';
+import { getConnectionToken, getModelToken } from '@nestjs/mongoose';
+import { NotificationService } from '../../src/components/notification/notification.service';
 import { ApolloDriver } from '@nestjs/apollo';
 import { GraphQLModule, GraphQLSchemaHost } from '@nestjs/graphql';
 import { graphql } from 'graphql';
@@ -37,6 +38,8 @@ describe('Support API privacy and request delivery', () => {
 				SupportService,
 				SupportResolver,
 				{ provide: getModelToken('Notice'), useValue: storage },
+				{ provide: getConnectionToken(), useValue: { transaction: async (work: any) => work({}) } },
+				{ provide: NotificationService, useValue: { notifySupportMessage: jest.fn() } },
 				{ provide: AuthService, useValue: auth },
 			],
 		}).compile();

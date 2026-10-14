@@ -1,0 +1,1558 @@
+{
+  "source": "Current Mongoose schemas; no database records or credentials",
+  "capturedAt": "2026-10-14T11:22:48.426Z",
+  "collections": [
+    {
+      "model": "BoConfig",
+      "collection": "boconfigs",
+      "fields": [
+        {
+          "name": "configKey",
+          "type": "enum",
+          "required": true,
+          "enumValues": [
+            "CONTACT",
+            "ANNOUNCEMENT",
+            "BANNER"
+          ],
+          "immutable": true
+        },
+        {
+          "name": "value",
+          "type": "String",
+          "required": true
+        },
+        {
+          "name": "configStatus",
+          "type": "enum",
+          "required": true,
+          "enumValues": [
+            "PAUSED",
+            "ACTIVE"
+          ]
+        },
+        {
+          "name": "_id",
+          "type": "ObjectId",
+          "required": true
+        },
+        {
+          "name": "createdAt",
+          "type": "Date",
+          "required": false,
+          "immutable": true
+        },
+        {
+          "name": "updatedAt",
+          "type": "Date",
+          "required": false
+        }
+      ],
+      "indexes": [
+        [
+          {
+            "configKey": 1
+          },
+          {
+            "unique": true,
+            "background": true
+          }
+        ]
+      ]
+    },
+    {
+      "model": "BoardArticle",
+      "collection": "boardArticles",
+      "fields": [
+        {
+          "name": "articleCategory",
+          "type": "enum",
+          "required": true,
+          "enumValues": [
+            "HOTEL_NEWS",
+            "TRAVEL_STORY",
+            "DESTINATION_GUIDE",
+            "TRAVEL_TIPS",
+            "FREE"
+          ]
+        },
+        {
+          "name": "articleStatus",
+          "type": "enum",
+          "required": false,
+          "enumValues": [
+            "DELETE",
+            "ACTIVE"
+          ]
+        },
+        {
+          "name": "articleTitle",
+          "type": "String",
+          "required": true
+        },
+        {
+          "name": "articleContent",
+          "type": "String",
+          "required": true
+        },
+        {
+          "name": "articleImage",
+          "type": "String",
+          "required": false
+        },
+        {
+          "name": "articleLikes",
+          "type": "Number",
+          "required": false
+        },
+        {
+          "name": "articleViews",
+          "type": "Number",
+          "required": false
+        },
+        {
+          "name": "articleComments",
+          "type": "Number",
+          "required": false
+        },
+        {
+          "name": "memberId",
+          "type": "ObjectId",
+          "required": true,
+          "ref": "Member",
+          "immutable": true
+        },
+        {
+          "name": "_id",
+          "type": "ObjectId",
+          "required": true
+        },
+        {
+          "name": "createdAt",
+          "type": "Date",
+          "required": false,
+          "immutable": true
+        },
+        {
+          "name": "updatedAt",
+          "type": "Date",
+          "required": false
+        }
+      ],
+      "indexes": []
+    },
+    {
+      "model": "Booking",
+      "collection": "bookings",
+      "fields": [
+        {
+          "name": "paymentMethod",
+          "type": "enum",
+          "required": false,
+          "enumValues": [
+            "BANK_CARD",
+            "CEO_BANK_ACCOUNT"
+          ],
+          "immutable": true
+        },
+        {
+          "name": "paymentStatus",
+          "type": "enum",
+          "required": false,
+          "enumValues": [
+            "DEMO_ONLY"
+          ],
+          "immutable": true
+        },
+        {
+          "name": "requestId",
+          "type": "String",
+          "required": false,
+          "immutable": true
+        },
+        {
+          "name": "currency",
+          "type": "enum",
+          "required": true,
+          "enumValues": [
+            "USD"
+          ],
+          "immutable": true
+        },
+        {
+          "name": "expiresAt",
+          "type": "Date",
+          "required": false
+        },
+        {
+          "name": "freeCancellationUntil",
+          "type": "Date",
+          "required": false,
+          "immutable": true
+        },
+        {
+          "name": "cancellationFeeRate",
+          "type": "Number",
+          "required": false,
+          "immutable": true
+        },
+        {
+          "name": "cancellationFee",
+          "type": "Number",
+          "required": false
+        },
+        {
+          "name": "refundAmount",
+          "type": "Number",
+          "required": false
+        },
+        {
+          "name": "cancelledAt",
+          "type": "Date",
+          "required": false
+        },
+        {
+          "name": "cancelledBy",
+          "type": "ObjectId",
+          "required": false,
+          "ref": "Member"
+        },
+        {
+          "name": "confirmedAt",
+          "type": "Date",
+          "required": false
+        },
+        {
+          "name": "confirmedAutomatically",
+          "type": "Boolean",
+          "required": false
+        },
+        {
+          "name": "memberId",
+          "type": "ObjectId",
+          "required": true,
+          "ref": "Member",
+          "immutable": true
+        },
+        {
+          "name": "hotelId",
+          "type": "ObjectId",
+          "required": true,
+          "ref": "Hotel",
+          "immutable": true
+        },
+        {
+          "name": "roomId",
+          "type": "ObjectId",
+          "required": true,
+          "ref": "Room",
+          "immutable": true
+        },
+        {
+          "name": "checkIn",
+          "type": "Date",
+          "required": true,
+          "immutable": true
+        },
+        {
+          "name": "checkOut",
+          "type": "Date",
+          "required": true,
+          "immutable": true
+        },
+        {
+          "name": "guests",
+          "type": "Number",
+          "required": true,
+          "immutable": true
+        },
+        {
+          "name": "rooms",
+          "type": "Number",
+          "required": true,
+          "immutable": true
+        },
+        {
+          "name": "nights",
+          "type": "Number",
+          "required": true,
+          "immutable": true
+        },
+        {
+          "name": "pricePerNight",
+          "type": "Number",
+          "required": true,
+          "immutable": true
+        },
+        {
+          "name": "totalPrice",
+          "type": "Number",
+          "required": true,
+          "immutable": true
+        },
+        {
+          "name": "bookingStatus",
+          "type": "enum",
+          "required": true,
+          "enumValues": [
+            "COMPLETED",
+            "CANCELLED",
+            "CONFIRMED",
+            "PENDING"
+          ]
+        },
+        {
+          "name": "_id",
+          "type": "ObjectId",
+          "required": true
+        },
+        {
+          "name": "createdAt",
+          "type": "Date",
+          "required": false,
+          "immutable": true
+        },
+        {
+          "name": "updatedAt",
+          "type": "Date",
+          "required": false
+        }
+      ],
+      "indexes": [
+        [
+          {
+            "roomId": 1,
+            "bookingStatus": 1,
+            "checkIn": 1,
+            "checkOut": 1
+          },
+          {
+            "background": true
+          }
+        ],
+        [
+          {
+            "memberId": 1,
+            "createdAt": -1
+          },
+          {
+            "background": true
+          }
+        ],
+        [
+          {
+            "hotelId": 1,
+            "createdAt": -1
+          },
+          {
+            "background": true
+          }
+        ],
+        [
+          {
+            "bookingStatus": 1,
+            "freeCancellationUntil": 1
+          },
+          {
+            "background": true
+          }
+        ],
+        [
+          {
+            "bookingStatus": 1,
+            "expiresAt": 1
+          },
+          {
+            "background": true
+          }
+        ],
+        [
+          {
+            "memberId": 1,
+            "requestId": 1
+          },
+          {
+            "unique": true,
+            "partialFilterExpression": {
+              "requestId": {
+                "$type": "string"
+              }
+            },
+            "background": true
+          }
+        ]
+      ]
+    },
+    {
+      "model": "Comment",
+      "collection": "comments",
+      "fields": [
+        {
+          "name": "bookingId",
+          "type": "ObjectId",
+          "required": false,
+          "ref": "Booking",
+          "immutable": true
+        },
+        {
+          "name": "rating",
+          "type": "Number",
+          "required": false
+        },
+        {
+          "name": "commentStatus",
+          "type": "enum",
+          "required": false,
+          "enumValues": [
+            "DELETE",
+            "ACTIVE"
+          ]
+        },
+        {
+          "name": "commentGroup",
+          "type": "enum",
+          "required": true,
+          "enumValues": [
+            "ARTICLE",
+            "MEMBER",
+            "HOTEL"
+          ]
+        },
+        {
+          "name": "commentContent",
+          "type": "String",
+          "required": true
+        },
+        {
+          "name": "commentRefId",
+          "type": "ObjectId",
+          "required": true
+        },
+        {
+          "name": "memberId",
+          "type": "ObjectId",
+          "required": true
+        },
+        {
+          "name": "_id",
+          "type": "ObjectId",
+          "required": true
+        },
+        {
+          "name": "createdAt",
+          "type": "Date",
+          "required": false,
+          "immutable": true
+        },
+        {
+          "name": "updatedAt",
+          "type": "Date",
+          "required": false
+        }
+      ],
+      "indexes": [
+        [
+          {
+            "bookingId": 1
+          },
+          {
+            "unique": true,
+            "partialFilterExpression": {
+              "commentGroup": "HOTEL",
+              "bookingId": {
+                "$type": "objectId"
+              }
+            },
+            "background": true
+          }
+        ],
+        [
+          {
+            "commentRefId": 1,
+            "commentStatus": 1,
+            "createdAt": -1
+          },
+          {
+            "background": true
+          }
+        ]
+      ]
+    },
+    {
+      "model": "Follow",
+      "collection": "follows",
+      "fields": [
+        {
+          "name": "followingId",
+          "type": "ObjectId",
+          "required": true
+        },
+        {
+          "name": "followerId",
+          "type": "ObjectId",
+          "required": true
+        },
+        {
+          "name": "_id",
+          "type": "ObjectId",
+          "required": true
+        },
+        {
+          "name": "createdAt",
+          "type": "Date",
+          "required": false,
+          "immutable": true
+        },
+        {
+          "name": "updatedAt",
+          "type": "Date",
+          "required": false
+        }
+      ],
+      "indexes": [
+        [
+          {
+            "followingId": 1,
+            "followerId": 1
+          },
+          {
+            "unique": true,
+            "background": true
+          }
+        ]
+      ]
+    },
+    {
+      "model": "Hotel",
+      "collection": "hotels",
+      "fields": [
+        {
+          "name": "bookingVersion",
+          "type": "Number",
+          "required": false,
+          "hidden": true
+        },
+        {
+          "name": "ownerId",
+          "type": "ObjectId",
+          "required": true,
+          "ref": "Member",
+          "immutable": true
+        },
+        {
+          "name": "hotelName",
+          "type": "String",
+          "required": true
+        },
+        {
+          "name": "hotelDescription",
+          "type": "String",
+          "required": true
+        },
+        {
+          "name": "hotelCountry",
+          "type": "String",
+          "required": true
+        },
+        {
+          "name": "hotelCity",
+          "type": "String",
+          "required": true
+        },
+        {
+          "name": "hotelAddress",
+          "type": "String",
+          "required": true
+        },
+        {
+          "name": "hotelTimezone",
+          "type": "String",
+          "required": true
+        },
+        {
+          "name": "hotelType",
+          "type": "enum",
+          "required": true,
+          "enumValues": [
+            "GUEST_HOUSE",
+            "APARTMENT",
+            "HOSTEL",
+            "RESORT",
+            "HOTEL"
+          ]
+        },
+        {
+          "name": "hotelStatus",
+          "type": "enum",
+          "required": true,
+          "enumValues": [
+            "DELETE",
+            "PAUSED",
+            "ACTIVE"
+          ]
+        },
+        {
+          "name": "hotelImages",
+          "type": "array",
+          "required": true
+        },
+        {
+          "name": "hotelAmenities",
+          "type": "array",
+          "required": true,
+          "arrayEnumValues": [
+            "RESTAURANT",
+            "AIR_CONDITIONING",
+            "SPA",
+            "GYM",
+            "BREAKFAST",
+            "PARKING",
+            "POOL",
+            "WIFI"
+          ]
+        },
+        {
+          "name": "hotelRating",
+          "type": "Number",
+          "required": true
+        },
+        {
+          "name": "hotelReviews",
+          "type": "Number",
+          "required": true
+        },
+        {
+          "name": "hotelRank",
+          "type": "Number",
+          "required": false
+        },
+        {
+          "name": "hotelViews",
+          "type": "Number",
+          "required": true
+        },
+        {
+          "name": "hotelLikes",
+          "type": "Number",
+          "required": true
+        },
+        {
+          "name": "deletedAt",
+          "type": "Date",
+          "required": false
+        },
+        {
+          "name": "_id",
+          "type": "ObjectId",
+          "required": true
+        },
+        {
+          "name": "createdAt",
+          "type": "Date",
+          "required": false,
+          "immutable": true
+        },
+        {
+          "name": "updatedAt",
+          "type": "Date",
+          "required": false
+        }
+      ],
+      "indexes": [
+        [
+          {
+            "ownerId": 1,
+            "hotelStatus": 1
+          },
+          {
+            "background": true
+          }
+        ],
+        [
+          {
+            "hotelStatus": 1,
+            "createdAt": -1,
+            "_id": -1
+          },
+          {
+            "background": true
+          }
+        ],
+        [
+          {
+            "hotelCountry": 1,
+            "hotelCity": 1,
+            "hotelStatus": 1
+          },
+          {
+            "background": true
+          }
+        ]
+      ]
+    },
+    {
+      "model": "Like",
+      "collection": "likes",
+      "fields": [
+        {
+          "name": "likeGroup",
+          "type": "enum",
+          "required": true,
+          "enumValues": [
+            "ARTICLE",
+            "MEMBER",
+            "HOTEL"
+          ]
+        },
+        {
+          "name": "likeRefId",
+          "type": "ObjectId",
+          "required": true
+        },
+        {
+          "name": "memberId",
+          "type": "ObjectId",
+          "required": true,
+          "ref": "Member"
+        },
+        {
+          "name": "_id",
+          "type": "ObjectId",
+          "required": true
+        },
+        {
+          "name": "createdAt",
+          "type": "Date",
+          "required": false,
+          "immutable": true
+        },
+        {
+          "name": "updatedAt",
+          "type": "Date",
+          "required": false
+        }
+      ],
+      "indexes": [
+        [
+          {
+            "memberId": 1,
+            "likeRefId": 1
+          },
+          {
+            "unique": true,
+            "background": true
+          }
+        ],
+        [
+          {
+            "memberId": 1,
+            "likeGroup": 1,
+            "createdAt": -1,
+            "_id": -1
+          },
+          {
+            "background": true
+          }
+        ]
+      ]
+    },
+    {
+      "model": "Member",
+      "collection": "members",
+      "fields": [
+        {
+          "name": "memberType",
+          "type": "enum",
+          "required": false,
+          "enumValues": [
+            "ADMIN",
+            "HOTEL_OWNER",
+            "USER"
+          ]
+        },
+        {
+          "name": "memberStatus",
+          "type": "enum",
+          "required": false,
+          "enumValues": [
+            "DELETE",
+            "BLOCK",
+            "ACTIVE"
+          ]
+        },
+        {
+          "name": "memberAuthType",
+          "type": "enum",
+          "required": false,
+          "enumValues": [
+            "TELEGRAM",
+            "EMAIL",
+            "PHONE"
+          ]
+        },
+        {
+          "name": "memberEmail",
+          "type": "String",
+          "required": true
+        },
+        {
+          "name": "memberPhone",
+          "type": "String",
+          "required": false
+        },
+        {
+          "name": "memberNick",
+          "type": "String",
+          "required": true
+        },
+        {
+          "name": "memberPassword",
+          "type": "String",
+          "required": true,
+          "hidden": true
+        },
+        {
+          "name": "memberFullName",
+          "type": "String",
+          "required": false
+        },
+        {
+          "name": "memberImage",
+          "type": "String",
+          "required": false
+        },
+        {
+          "name": "memberAddress",
+          "type": "String",
+          "required": false
+        },
+        {
+          "name": "memberDesc",
+          "type": "String",
+          "required": false
+        },
+        {
+          "name": "memberHotels",
+          "type": "Number",
+          "required": false
+        },
+        {
+          "name": "memberArticles",
+          "type": "Number",
+          "required": false
+        },
+        {
+          "name": "memberFollowers",
+          "type": "Number",
+          "required": false
+        },
+        {
+          "name": "memberFollowings",
+          "type": "Number",
+          "required": false
+        },
+        {
+          "name": "memberPoints",
+          "type": "Number",
+          "required": false
+        },
+        {
+          "name": "memberLikes",
+          "type": "Number",
+          "required": false
+        },
+        {
+          "name": "memberViews",
+          "type": "Number",
+          "required": false
+        },
+        {
+          "name": "memberComments",
+          "type": "Number",
+          "required": false
+        },
+        {
+          "name": "memberRank",
+          "type": "Number",
+          "required": false
+        },
+        {
+          "name": "memberWarnings",
+          "type": "Number",
+          "required": false
+        },
+        {
+          "name": "memberBlocks",
+          "type": "Number",
+          "required": false
+        },
+        {
+          "name": "deletedAt",
+          "type": "Date",
+          "required": false
+        },
+        {
+          "name": "_id",
+          "type": "ObjectId",
+          "required": true
+        },
+        {
+          "name": "createdAt",
+          "type": "Date",
+          "required": false,
+          "immutable": true
+        },
+        {
+          "name": "updatedAt",
+          "type": "Date",
+          "required": false
+        }
+      ],
+      "indexes": [
+        [
+          {
+            "memberEmail": 1
+          },
+          {
+            "unique": true,
+            "background": true
+          }
+        ],
+        [
+          {
+            "memberPhone": 1
+          },
+          {
+            "unique": true,
+            "sparse": true,
+            "background": true
+          }
+        ],
+        [
+          {
+            "memberNick": 1
+          },
+          {
+            "unique": true,
+            "sparse": true,
+            "background": true
+          }
+        ]
+      ]
+    },
+    {
+      "model": "Notice",
+      "collection": "notices",
+      "fields": [
+        {
+          "name": "noticeCategory",
+          "type": "enum",
+          "required": true,
+          "enumValues": [
+            "INQUIRY",
+            "TERMS",
+            "ANNOUNCEMENT",
+            "FAQ"
+          ]
+        },
+        {
+          "name": "noticeStatus",
+          "type": "enum",
+          "required": false,
+          "enumValues": [
+            "DELETE",
+            "ACTIVE",
+            "HOLD"
+          ]
+        },
+        {
+          "name": "noticeTitle",
+          "type": "String",
+          "required": true
+        },
+        {
+          "name": "requestId",
+          "type": "String",
+          "required": false
+        },
+        {
+          "name": "noticeRevision",
+          "type": "Number",
+          "required": false
+        },
+        {
+          "name": "noticeResponse",
+          "type": "String",
+          "required": false
+        },
+        {
+          "name": "respondedAt",
+          "type": "Date",
+          "required": false
+        },
+        {
+          "name": "noticeContent",
+          "type": "String",
+          "required": true
+        },
+        {
+          "name": "memberId",
+          "type": "ObjectId",
+          "required": true,
+          "ref": "Member"
+        },
+        {
+          "name": "_id",
+          "type": "ObjectId",
+          "required": true
+        },
+        {
+          "name": "createdAt",
+          "type": "Date",
+          "required": false,
+          "immutable": true
+        },
+        {
+          "name": "updatedAt",
+          "type": "Date",
+          "required": false
+        }
+      ],
+      "indexes": [
+        [
+          {
+            "memberId": 1,
+            "requestId": 1
+          },
+          {
+            "unique": true,
+            "partialFilterExpression": {
+              "requestId": {
+                "$type": "string"
+              }
+            },
+            "background": true
+          }
+        ]
+      ]
+    },
+    {
+      "model": "Notification",
+      "collection": "notifications",
+      "fields": [
+        {
+          "name": "notificationType",
+          "type": "enum",
+          "required": true,
+          "enumValues": [
+            "REVIEW",
+            "SUPPORT_MESSAGE",
+            "ROOM_CREATED",
+            "HOTEL_CREATED",
+            "BOOKING_COMPLETED",
+            "BOOKING_CANCELLED",
+            "BOOKING_CONFIRMED",
+            "BOOKING_CREATED",
+            "FOLLOW",
+            "COMMENT",
+            "LIKE"
+          ]
+        },
+        {
+          "name": "notificationStatus",
+          "type": "enum",
+          "required": false,
+          "enumValues": [
+            "READ",
+            "WAIT"
+          ]
+        },
+        {
+          "name": "notificationGroup",
+          "type": "enum",
+          "required": true,
+          "enumValues": [
+            "SUPPORT",
+            "ROOM",
+            "BOOKING",
+            "HOTEL",
+            "ARTICLE",
+            "MEMBER"
+          ]
+        },
+        {
+          "name": "notificationTitle",
+          "type": "String",
+          "required": true
+        },
+        {
+          "name": "notificationDesc",
+          "type": "String",
+          "required": false
+        },
+        {
+          "name": "authorId",
+          "type": "ObjectId",
+          "required": true,
+          "ref": "Member"
+        },
+        {
+          "name": "receiverId",
+          "type": "ObjectId",
+          "required": true,
+          "ref": "Member"
+        },
+        {
+          "name": "hotelId",
+          "type": "ObjectId",
+          "required": false,
+          "ref": "Hotel"
+        },
+        {
+          "name": "bookingId",
+          "type": "ObjectId",
+          "required": false,
+          "ref": "Booking"
+        },
+        {
+          "name": "roomId",
+          "type": "ObjectId",
+          "required": false,
+          "ref": "Room"
+        },
+        {
+          "name": "inquiryId",
+          "type": "ObjectId",
+          "required": false,
+          "ref": "Notice"
+        },
+        {
+          "name": "articleId",
+          "type": "ObjectId",
+          "required": false,
+          "ref": "BoardArticle"
+        },
+        {
+          "name": "_id",
+          "type": "ObjectId",
+          "required": true
+        },
+        {
+          "name": "createdAt",
+          "type": "Date",
+          "required": false,
+          "immutable": true
+        },
+        {
+          "name": "updatedAt",
+          "type": "Date",
+          "required": false
+        }
+      ],
+      "indexes": [
+        [
+          {
+            "receiverId": 1,
+            "createdAt": -1,
+            "_id": -1
+          },
+          {
+            "background": true
+          }
+        ],
+        [
+          {
+            "receiverId": 1,
+            "notificationStatus": 1,
+            "createdAt": -1,
+            "_id": -1
+          },
+          {
+            "background": true
+          }
+        ],
+        [
+          {
+            "receiverId": 1,
+            "notificationType": 1,
+            "inquiryId": 1
+          },
+          {
+            "unique": true,
+            "partialFilterExpression": {
+              "inquiryId": {
+                "$type": "objectId"
+              }
+            },
+            "background": true
+          }
+        ]
+      ]
+    },
+    {
+      "model": "PaymentCard",
+      "collection": "paymentCards",
+      "fields": [
+        {
+          "name": "memberId",
+          "type": "ObjectId",
+          "required": true,
+          "ref": "Member",
+          "immutable": true
+        },
+        {
+          "name": "cardBrand",
+          "type": "enum",
+          "required": true,
+          "enumValues": [
+            "MASTERCARD",
+            "VISA"
+          ]
+        },
+        {
+          "name": "cardLast4",
+          "type": "String",
+          "required": true
+        },
+        {
+          "name": "cardHolderName",
+          "type": "String",
+          "required": true
+        },
+        {
+          "name": "expiryMonth",
+          "type": "Number",
+          "required": true
+        },
+        {
+          "name": "expiryYear",
+          "type": "Number",
+          "required": true
+        },
+        {
+          "name": "cardStatus",
+          "type": "enum",
+          "required": true,
+          "enumValues": [
+            "PENDING"
+          ]
+        },
+        {
+          "name": "_id",
+          "type": "ObjectId",
+          "required": true
+        },
+        {
+          "name": "createdAt",
+          "type": "Date",
+          "required": false,
+          "immutable": true
+        },
+        {
+          "name": "updatedAt",
+          "type": "Date",
+          "required": false
+        }
+      ],
+      "indexes": [
+        [
+          {
+            "memberId": 1
+          },
+          {
+            "unique": true,
+            "background": true
+          }
+        ]
+      ]
+    },
+    {
+      "model": "Room",
+      "collection": "rooms",
+      "fields": [
+        {
+          "name": "bookingVersion",
+          "type": "Number",
+          "required": false,
+          "hidden": true
+        },
+        {
+          "name": "hotelId",
+          "type": "ObjectId",
+          "required": true,
+          "ref": "Hotel",
+          "immutable": true
+        },
+        {
+          "name": "roomName",
+          "type": "String",
+          "required": true
+        },
+        {
+          "name": "roomDescription",
+          "type": "String",
+          "required": true
+        },
+        {
+          "name": "roomType",
+          "type": "enum",
+          "required": true,
+          "enumValues": [
+            "FAMILY",
+            "SUITE",
+            "DELUXE",
+            "TWIN",
+            "DOUBLE",
+            "SINGLE"
+          ]
+        },
+        {
+          "name": "roomPrice",
+          "type": "Number",
+          "required": true
+        },
+        {
+          "name": "roomCapacity",
+          "type": "Number",
+          "required": true
+        },
+        {
+          "name": "roomQuantity",
+          "type": "Number",
+          "required": true
+        },
+        {
+          "name": "bedType",
+          "type": "enum",
+          "required": true,
+          "enumValues": [
+            "BUNK",
+            "KING",
+            "QUEEN",
+            "DOUBLE",
+            "SINGLE"
+          ]
+        },
+        {
+          "name": "roomSize",
+          "type": "Number",
+          "required": true
+        },
+        {
+          "name": "roomImages",
+          "type": "array",
+          "required": true
+        },
+        {
+          "name": "roomAmenities",
+          "type": "array",
+          "required": true,
+          "arrayEnumValues": [
+            "PRIVATE_BATHROOM",
+            "BALCONY",
+            "SAFE",
+            "MINIBAR",
+            "TV",
+            "AIR_CONDITIONING",
+            "WIFI"
+          ]
+        },
+        {
+          "name": "roomStatus",
+          "type": "enum",
+          "required": true,
+          "enumValues": [
+            "DELETE",
+            "PAUSED",
+            "ACTIVE"
+          ]
+        },
+        {
+          "name": "deletedAt",
+          "type": "Date",
+          "required": false
+        },
+        {
+          "name": "_id",
+          "type": "ObjectId",
+          "required": true
+        },
+        {
+          "name": "createdAt",
+          "type": "Date",
+          "required": false,
+          "immutable": true
+        },
+        {
+          "name": "updatedAt",
+          "type": "Date",
+          "required": false
+        }
+      ],
+      "indexes": [
+        [
+          {
+            "hotelId": 1,
+            "roomStatus": 1,
+            "roomPrice": 1
+          },
+          {
+            "background": true
+          }
+        ]
+      ]
+    },
+    {
+      "model": "Session",
+      "collection": "sessions",
+      "fields": [
+        {
+          "name": "memberId",
+          "type": "ObjectId",
+          "required": true,
+          "ref": "Member"
+        },
+        {
+          "name": "refreshTokenHash",
+          "type": "String",
+          "required": true,
+          "hidden": true
+        },
+        {
+          "name": "expiresAt",
+          "type": "Date",
+          "required": true
+        },
+        {
+          "name": "revokedAt",
+          "type": "Date",
+          "required": false
+        },
+        {
+          "name": "_id",
+          "type": "ObjectId",
+          "required": true
+        },
+        {
+          "name": "createdAt",
+          "type": "Date",
+          "required": false,
+          "immutable": true
+        },
+        {
+          "name": "updatedAt",
+          "type": "Date",
+          "required": false
+        }
+      ],
+      "indexes": [
+        [
+          {
+            "memberId": 1
+          },
+          {
+            "background": true
+          }
+        ],
+        [
+          {
+            "expiresAt": 1
+          },
+          {
+            "expireAfterSeconds": 0,
+            "background": true
+          }
+        ]
+      ]
+    },
+    {
+      "model": "View",
+      "collection": "views",
+      "fields": [
+        {
+          "name": "viewGroup",
+          "type": "enum",
+          "required": true,
+          "enumValues": [
+            "ARTICLE",
+            "HOTEL",
+            "MEMBER"
+          ]
+        },
+        {
+          "name": "viewRefId",
+          "type": "ObjectId",
+          "required": true
+        },
+        {
+          "name": "memberId",
+          "type": "ObjectId",
+          "required": true,
+          "ref": "Member"
+        },
+        {
+          "name": "_id",
+          "type": "ObjectId",
+          "required": true
+        },
+        {
+          "name": "createdAt",
+          "type": "Date",
+          "required": false,
+          "immutable": true
+        },
+        {
+          "name": "updatedAt",
+          "type": "Date",
+          "required": false
+        }
+      ],
+      "indexes": [
+        [
+          {
+            "memberId": 1,
+            "viewRefId": 1
+          },
+          {
+            "unique": true,
+            "background": true
+          }
+        ]
+      ]
+    }
+  ],
+  "logicalReferences": {
+    "Follow": {
+      "followingId": [
+        "Member"
+      ],
+      "followerId": [
+        "Member"
+      ]
+    },
+    "Comment": {
+      "memberId": [
+        "Member"
+      ],
+      "commentRefId": [
+        "Hotel",
+        "Member",
+        "BoardArticle"
+      ]
+    },
+    "Like": {
+      "likeRefId": [
+        "Hotel",
+        "Member",
+        "BoardArticle"
+      ]
+    },
+    "View": {
+      "viewRefId": [
+        "Hotel",
+        "Member",
+        "BoardArticle"
+      ]
+    }
+  }
+}

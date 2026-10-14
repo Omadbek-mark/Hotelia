@@ -35,5 +35,6 @@ export enum HotelSort {
 	RATING = 'RATING',
 	MOST_POPULAR = 'MOST_POPULAR',
 	MOST_LIKED = 'MOST_LIKED',
+	MOST_VIEWED = 'MOST_VIEWED',
 }
 registerEnumType(HotelSort, { name: 'HotelSort' });

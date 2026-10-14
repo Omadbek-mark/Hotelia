@@ -12,6 +12,8 @@ import { FavoritesInquiry } from '../../libs/dto/like/favorites.inquiry';
 import { Hotel, Hotels } from '../../libs/dto/hotel/hotel';
 import { HotelStatus } from '../../libs/enums/hotel.enum';
 import { MemberStatus, MemberType } from '../../libs/enums/member.enum';
+import { Comment } from '../../libs/dto/comment/comment';
+import { CommentGroup, CommentStatus } from '../../libs/enums/comment.enum';
 
 @Injectable()
 export class LikeService {
@@ -19,6 +21,7 @@ export class LikeService {
 		@InjectModel('Like') private readonly likeModel: Model<Like>,
 		@InjectModel('Hotel') private readonly hotelModel: Model<Hotel>,
 		@InjectConnection() private readonly connection: Connection,
+		@InjectModel('Comment') private readonly commentModel: Model<Comment>,
 	) {}
 
 	public async toggleLike(input: LikeInput): Promise<number> {
@@ -93,6 +96,21 @@ export class LikeService {
 							.lean()
 							.exec();
 						if (!hotel) throw new NotFoundException(Message.NO_DATA_FOUND);
+						const commentCount = await this.commentModel
+							.countDocuments({
+								commentRefId: hotelId,
+								commentGroup: CommentGroup.HOTEL,
+								commentStatus: CommentStatus.ACTIVE,
+							})
+							.session(session)
+							.exec();
+						await this.hotelModel
+							.updateOne(
+								{ _id: hotelId },
+								{ $set: { hotelRank: hotel.hotelLikes + commentCount } },
+								{ session, timestamps: false },
+							)
+							.exec();
 					}
 					return { hotelId, isFavorite: favorite, hotelLikes: hotel.hotelLikes };
 				});

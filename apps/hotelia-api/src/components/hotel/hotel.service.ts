@@ -3,7 +3,7 @@ import { InjectConnection, InjectModel } from '@nestjs/mongoose';
 import { Error as MongooseError, ClientSession, Connection, FilterQuery, Model, PipelineStage, Types } from 'mongoose';
 import { Booking } from '../../libs/dto/booking/booking';
 import { inventoryBookingFilter } from '../../libs/booking/inventory';
-import { Hotel, Hotels } from '../../libs/dto/hotel/hotel';
+import { Hotel, Hotels, HotelLocation } from '../../libs/dto/hotel/hotel';
 import { AllHotelsInquiry, HotelSearch, HotelsInquiry, OwnerHotelsInquiry } from '../../libs/dto/hotel/hotel.inquiry';
 import { getStayDates } from '../../libs/booking/stay-dates';
 import { roomInventoryPipeline } from '../../libs/booking/availability-pipeline';
@@ -16,8 +16,10 @@ import { ViewService } from '../view/view.service';
 import { ViewGroup } from '../../libs/enums/view.enum';
 import { MemberService } from '../member/member.service';
 import { HotelSort, HotelStatus } from '../../libs/enums/hotel.enum';
+import { CommentGroup, CommentStatus } from '../../libs/enums/comment.enum';
 import { RoomStatus } from '../../libs/enums/room.enum';
 import { Message } from '../../libs/enums/common.enum';
+import { NotificationService } from '../notification/notification.service';
 
 @Injectable()
 export class HotelService {
@@ -27,6 +29,7 @@ export class HotelService {
 		private readonly viewService: ViewService,
 		@InjectModel('Hotel') private readonly hotelModel: Model<Hotel>,
 		@InjectModel('Booking') private readonly bookingModel: Model<Booking>,
+		private readonly notificationService: NotificationService,
 	) {}
 
 	// A real write serializes booking creation with hotel/room inventory changes.
@@ -34,14 +37,17 @@ export class HotelService {
 		hotelId: Types.ObjectId,
 		session: ClientSession,
 		ownerId?: Types.ObjectId,
+		adminDeletion = false,
 	): Promise<Hotel> {
 		const hotel = await this.hotelModel
 			.findOneAndUpdate(
 				{
 					_id: hotelId,
-					...(ownerId
-						? { ownerId, hotelStatus: { $in: [HotelStatus.ACTIVE, HotelStatus.PAUSED] } }
-						: { hotelStatus: HotelStatus.ACTIVE }),
+					...(adminDeletion
+						? { hotelStatus: { $in: [HotelStatus.ACTIVE, HotelStatus.PAUSED, HotelStatus.DELETE] } }
+						: ownerId
+							? { ownerId, hotelStatus: { $in: [HotelStatus.ACTIVE, HotelStatus.PAUSED] } }
+							: { hotelStatus: HotelStatus.ACTIVE }),
 				},
 				{ $inc: { bookingVersion: 1 } },
 				{ new: true, session, timestamps: false },
@@ -65,6 +71,7 @@ export class HotelService {
 					},
 					session,
 				);
+				await this.notificationService.notifyInventoryCreated(result.ownerId, result, session);
 				return result;
 			});
 		} catch (err) {
@@ -126,7 +133,7 @@ export class HotelService {
 		}
 	}
 
-	public async deleteHotel(memberId: Types.ObjectId, hotelId: Types.ObjectId): Promise<Hotel> {
+	public async deleteHotel(memberId: Types.ObjectId, hotelId: Types.ObjectId, byAdmin = false): Promise<Hotel> {
 		const search = {
 			_id: hotelId,
 			ownerId: memberId,
@@ -150,7 +157,9 @@ export class HotelService {
 				.exec();
 			if (hasBookings) throw new ConflictException('Hotel has active bookings');
 
-			await this.memberService.memberStatsEditor({ _id: memberId, targetKey: 'memberHotels', modifier: -1 }, session);
+			const countChange = { _id: memberId, targetKey: 'memberHotels', modifier: -1 };
+			if (byAdmin) await this.memberService.memberStatsEditor(countChange, session, true);
+			else await this.memberService.memberStatsEditor(countChange, session);
 			return result;
 		});
 	}
@@ -159,6 +168,24 @@ export class HotelService {
 		const match: FilterQuery<Hotel> = { hotelStatus: HotelStatus.ACTIVE };
 		if (input.search?.ownerId) match.ownerId = shapeIntoMongoObjectId(input.search.ownerId);
 		return await this.getHotelList(match, input);
+	}
+
+	public async getHotelLocations(): Promise<HotelLocation[]> {
+		return this.hotelModel
+			.aggregate<HotelLocation>([
+				{
+					$match: {
+						hotelStatus: HotelStatus.ACTIVE,
+						hotelCountry: { $in: ['Uzbekistan', 'Kazakhstan', 'Kyrgyzstan'] },
+					},
+				},
+				{ $project: { city: { $trim: { input: '$hotelCity' } }, country: '$hotelCountry' } },
+				{ $match: { city: { $ne: '' } } },
+				{ $group: { _id: { city: '$city', country: '$country' } } },
+				{ $project: { _id: 0, city: '$_id.city', country: '$_id.country' } },
+				{ $sort: { country: 1, city: 1 } },
+			])
+			.exec();
 	}
 
 	public async getOwnerInventoryCounts(ownerId: Types.ObjectId): Promise<{ totalHotels: number; totalRooms: number }> {
@@ -204,6 +231,10 @@ export class HotelService {
 	}
 
 	public async updateHotelByAdmin(input: AdminHotelUpdate): Promise<Hotel> {
+		if (input.hotelStatus === HotelStatus.DELETE) {
+			const hotel = await this.getHotelByAdmin(shapeIntoMongoObjectId(input._id));
+			return this.deleteHotel(hotel.ownerId, shapeIntoMongoObjectId(input._id), true);
+		}
 		if (![HotelStatus.ACTIVE, HotelStatus.PAUSED].includes(input.hotelStatus)) {
 			throw new BadRequestException(Message.NOT_ALLOWED_REQUEST);
 		}
@@ -256,9 +287,38 @@ export class HotelService {
 			[HotelSort.PRICE_DESC]: { startingPrice: -1, _id: -1 },
 			[HotelSort.NEWEST]: { createdAt: -1, _id: -1 },
 			[HotelSort.RATING]: { hotelRating: -1, _id: -1 },
-			[HotelSort.MOST_POPULAR]: { hotelRank: -1, hotelViews: -1, _id: -1 },
+			[HotelSort.MOST_POPULAR]: { hotelRank: -1, hotelLikes: -1, _id: -1 },
 			[HotelSort.MOST_LIKED]: { hotelLikes: -1, _id: -1 },
+			[HotelSort.MOST_VIEWED]: { hotelViews: -1, _id: -1 },
 		};
+		const engagementPipeline: PipelineStage[] =
+			input.sort === HotelSort.MOST_POPULAR
+				? [
+						{
+							$lookup: {
+								from: 'comments',
+								localField: '_id',
+								foreignField: 'commentRefId',
+								as: 'discoveryComments',
+								pipeline: [
+									{ $match: { commentGroup: CommentGroup.HOTEL, commentStatus: CommentStatus.ACTIVE } },
+									{ $count: 'total' },
+								],
+							},
+						},
+						{
+							$set: {
+								hotelRank: {
+									$add: [
+										{ $ifNull: ['$hotelLikes', 0] },
+										{ $ifNull: [{ $arrayElemAt: ['$discoveryComments.total', 0] }, 0] },
+									],
+								},
+							},
+						},
+						{ $unset: 'discoveryComments' },
+					]
+				: [];
 		const result = await this.hotelModel
 			.aggregate<Hotels>([
 				{ $match: match },
@@ -277,6 +337,7 @@ export class HotelService {
 						]
 					: []),
 				...(filterRooms ? [...pricePipeline, { $match: { startingPrice: { $ne: null } } }] : []),
+				...engagementPipeline,
 				{ $sort: sorts[input.sort] },
 				{
 					$facet: {
@@ -346,12 +407,14 @@ export class HotelService {
 	}
 
 	private shapeMatchQuery(match: FilterQuery<Hotel>, input: HotelsInquiry): void {
-		const { text, destination, hotelType, minRating, amenities } = input.search ?? {};
+		const { text, destination, cities, hotelType, minRating, amenities } = input.search ?? {};
 		if (text?.trim()) match.hotelName = { $regex: escapeSearchText(text.trim()), $options: 'i' };
 		if (destination?.trim()) {
 			const location = { $regex: escapeSearchText(destination.trim()), $options: 'i' };
 			match.$or = [{ hotelCountry: location }, { hotelCity: location }, { hotelAddress: location }];
 		}
+		if (cities?.length)
+			match.hotelCity = { $in: cities.map((city) => new RegExp(`^${escapeSearchText(city.trim())}$`, 'i')) };
 		if (hotelType) match.hotelType = hotelType;
 		if (minRating !== undefined) match.hotelRating = { $gte: minRating };
 		// Every selected amenity must be present on the hotel.

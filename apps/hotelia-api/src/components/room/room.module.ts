@@ -6,6 +6,7 @@ import { AuthModule } from '../auth/auth.module';
 import { HotelModule } from '../hotel/hotel.module';
 import { RoomResolver } from './room.resolver';
 import { RoomService } from './room.service';
+import { NotificationModule } from '../notification/notification.module';
 
 @Module({
 	imports: [
@@ -15,6 +16,7 @@ import { RoomService } from './room.service';
 		]),
 		AuthModule,
 		HotelModule,
+		NotificationModule,
 	],
 	providers: [RoomService, RoomResolver],
 	exports: [RoomService],

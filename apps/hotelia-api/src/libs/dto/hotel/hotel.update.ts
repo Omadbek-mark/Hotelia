@@ -21,7 +21,7 @@ export class AdminHotelUpdate {
 	@Field(() => String)
 	_id!: string;
 
-	@IsIn([HotelStatus.ACTIVE, HotelStatus.PAUSED])
+	@IsIn([HotelStatus.ACTIVE, HotelStatus.PAUSED, HotelStatus.DELETE])
 	@Field(() => HotelStatus)
 	hotelStatus!: HotelStatus;
 }

@@ -1,5 +1,5 @@
 import { Field, InputType, Int, ObjectType } from '@nestjs/graphql';
-import { IsEnum, IsInt, Max, Min, ValidateIf } from 'class-validator';
+import { ArrayMaxSize, ArrayMinSize, IsArray, IsEnum, IsInt, Max, Min, ValidateIf } from 'class-validator';
 import { Types } from 'mongoose';
 import { NotificationGroup, NotificationStatus, NotificationType } from '../../enums/notification.enum';
 import { TotalCounter } from '../member/member';
@@ -16,6 +16,8 @@ export class Notification {
 	@Field(() => String) receiverId!: Types.ObjectId;
 	@Field(() => String, { nullable: true }) hotelId?: Types.ObjectId;
 	@Field(() => String, { nullable: true }) bookingId?: Types.ObjectId;
+	@Field(() => String, { nullable: true }) roomId?: Types.ObjectId;
+	@Field(() => String, { nullable: true }) inquiryId?: Types.ObjectId;
 	@Field(() => Date) createdAt!: Date;
 	@Field(() => Date) updatedAt!: Date;
 }
@@ -24,6 +26,12 @@ export class Notification {
 export class Notifications {
 	@Field(() => [Notification]) list!: Notification[];
 	@Field(() => [TotalCounter]) metaCounter!: TotalCounter[];
+}
+
+@ObjectType()
+export class UnreadNotificationCount {
+	@Field(() => NotificationType) notificationType!: NotificationType;
+	@Field(() => Int) total!: number;
 }
 
 @InputType()
@@ -42,4 +50,19 @@ export class NotificationsInquiry {
 	@IsEnum(NotificationStatus)
 	@Field(() => NotificationStatus, { nullable: true })
 	notificationStatus?: NotificationStatus;
+	@ValidateIf((_, value) => value !== undefined)
+	@IsEnum(NotificationType)
+	@Field(() => NotificationType, { nullable: true })
+	notificationType?: NotificationType;
+	@ValidateIf((_, value) => value !== undefined)
+	@IsArray()
+	@ArrayMinSize(1)
+	@ArrayMaxSize(Object.values(NotificationType).length)
+	@IsEnum(NotificationType, { each: true })
+	@Field(() => [NotificationType], { nullable: true })
+	notificationTypes?: NotificationType[];
+	@ValidateIf((_, value) => value !== undefined)
+	@IsEnum(NotificationGroup)
+	@Field(() => NotificationGroup, { nullable: true })
+	notificationGroup?: NotificationGroup;
 }

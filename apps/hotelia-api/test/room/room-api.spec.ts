@@ -40,6 +40,7 @@ describe('Room GraphQL API', () => {
 			imports: [GraphQLModule.forRoot({ driver: ApolloDriver, autoSchemaFile: true })],
 			providers: [
 				RoomService,
+				{ provide: NotificationService, useValue: { notifyInventoryCreated: jest.fn() } },
 				RoomResolver,
 				{ provide: getModelToken('Room'), useValue: storage },
 				{ provide: getModelToken('Booking'), useValue: bookings },
@@ -61,7 +62,7 @@ describe('Room GraphQL API', () => {
 		auth.verifyToken.mockResolvedValue({ _id: memberId, memberType: 'HOTEL_OWNER' });
 		hotels.getOwnerHotel.mockResolvedValue({ _id: hotelId });
 		hotels.getHotel.mockResolvedValue({ _id: hotelId, hotelTimezone: 'Asia/Seoul' });
-		storage.create.mockImplementation(async (input) => ({ _id: roomId, ...input }));
+		storage.create.mockImplementation(async (input) => [{ _id: roomId, ...input[0] }]);
 		storage.aggregate.mockReturnValue({ exec: async () => [{ list: [], metaCounter: [] }] });
 		const room = { _id: roomId, hotelId, roomStatus: 'ACTIVE', roomQuantity: 5, roomCapacity: 2 };
 		const query = { lean: () => ({ exec: async () => room }) };
@@ -98,6 +99,23 @@ describe('Room GraphQL API', () => {
 				},
 			},
 		);
+	it('admin deletion locks hotel inventory and rejects rooms with active bookings', async () => {
+		auth.verifyToken.mockResolvedValue({ _id: memberId, memberType: 'ADMIN' });
+		storage.findOne.mockReturnValue({ lean: () => ({ exec: async () => ({ _id: roomId, hotelId }) }) });
+		storage.findOneAndUpdate.mockReturnValue({ exec: async () => ({ _id: roomId, roomStatus: 'DELETE' }) });
+		const source = 'mutation($input:AdminRoomUpdate!){updateRoomByAdmin(input:$input){_id roomStatus}}';
+		const variables = { input: { _id: String(roomId), roomStatus: 'DELETE' } };
+		expect((await run(source, variables, true)).errors).toBeUndefined();
+		expect(hotels.lockBookingHotel).toHaveBeenCalledWith(hotelId, session, undefined, true);
+		expect(storage.findOneAndUpdate.mock.calls[0][1].$set).toMatchObject({
+			roomStatus: 'DELETE',
+			deletedAt: expect.any(Date),
+		});
+		bookings.exists.mockReturnValue({ session: () => ({ exec: async () => ({ _id: roomId }) }) });
+		storage.findOneAndUpdate.mockClear();
+		expect((await run(source, variables, true)).errors?.[0].message).toBe('Room has active bookings');
+		expect(storage.findOneAndUpdate).not.toHaveBeenCalled();
+	});
 	it('admin room status mutation validates roles and only allows active or paused', async () => {
 		const source = 'mutation($input:AdminRoomUpdate!){updateRoomByAdmin(input:$input){_id}}';
 		const input = { _id: String(roomId), roomStatus: 'PAUSED' };
@@ -107,7 +125,7 @@ describe('Room GraphQL API', () => {
 			expect((await run(source, { input }, true)).errors).toBeDefined();
 		}
 		auth.verifyToken.mockResolvedValue({ _id: memberId, memberType: 'ADMIN' });
-		for (const change of [{ roomStatus: 'DELETE' }, { roomStatus: null }, { _id: 'bad' }, { roomPrice: 1 }])
+		for (const change of [{ roomStatus: 'INVALID' }, { roomStatus: null }, { _id: 'bad' }, { roomPrice: 1 }])
 			expect((await run(source, { input: { ...input, ...change } }, true)).errors).toBeDefined();
 		expect(storage.findOneAndUpdate).not.toHaveBeenCalled();
 		storage.findOneAndUpdate.mockReturnValue({ exec: async () => ({ _id: roomId }) });
@@ -155,7 +173,8 @@ describe('Room GraphQL API', () => {
 		const overlap = pipeline[1].$lookup.pipeline[0].$match;
 		expect(overlap.$or[0]).toEqual({ bookingStatus: 'CONFIRMED' });
 		expect(overlap.$or[1].bookingStatus).toBe('PENDING');
-		expect(overlap.$or[1].$or[0].expiresAt.$gt).toBeInstanceOf(Date);
+		expect(overlap.$or[1].$or).toContainEqual({ freeCancellationUntil: { $type: 'date' } });
+		expect(overlap.$or[1].$or[1].expiresAt.$gt).toBeInstanceOf(Date);
 		expect(overlap.checkIn).toEqual({ $lt: new Date('2035-09-15') });
 		expect(overlap.checkOut).toEqual({ $gt: new Date('2035-09-10') });
 		expect(pipeline[2].$set.nightlyBooked.$map.input).toEqual({ $range: [0, 5] });
@@ -323,7 +342,7 @@ describe('Room GraphQL API', () => {
 		expect(result.errors).toBeUndefined();
 		expect(result.data?.createRoom).toMatchObject({ hotelId: String(hotelId), roomStatus: 'ACTIVE', roomQuantity: 5 });
 		expect(hotels.getOwnerHotel).toHaveBeenCalledWith(memberId, hotelId);
-		expect(storage.create).toHaveBeenCalledWith({ ...validInput(), hotelId, roomStatus: 'ACTIVE' });
+		expect(storage.create).toHaveBeenCalledWith([{ ...validInput(), hotelId, roomStatus: 'ACTIVE' }], { session });
 		expect(hotels.getOwnerHotel.mock.invocationCallOrder[0]).toBeLessThan(storage.create.mock.invocationCallOrder[0]);
 	});
 	it.each(['USER', 'ADMIN', 'GUEST'])('rejects creation by %s', async (role) => {
@@ -352,7 +371,7 @@ describe('Room GraphQL API', () => {
 		await app
 			.get(RoomService)
 			.createRoom(memberId, { ...validInput(), roomStatus: 'DELETE', deletedAt: new Date(), ownerId: memberId } as any);
-		expect(storage.create.mock.calls[0][0]).toEqual({ ...validInput(), hotelId, roomStatus: 'ACTIVE' });
+		expect(storage.create.mock.calls[0][0]).toEqual([{ ...validInput(), hotelId, roomStatus: 'ACTIVE' }]);
 	});
 	it('maps schema validation errors to bad request', async () => {
 		storage.create.mockRejectedValue(new MongooseError.ValidationError());
@@ -421,3 +440,4 @@ describe('Room GraphQL API', () => {
 		expect((await list()).errors?.[0].originalError).toBe(error);
 	});
 });
+import { NotificationService } from '../../src/components/notification/notification.service';

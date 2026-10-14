@@ -1,7 +1,12 @@
 import { UseGuards, ValidationPipe } from '@nestjs/common';
 import { Args, Int, Mutation, Query, Resolver } from '@nestjs/graphql';
 import { Types } from 'mongoose';
-import { Notification, Notifications, NotificationsInquiry } from '../../libs/dto/notification/notification';
+import {
+	Notification,
+	Notifications,
+	NotificationsInquiry,
+	UnreadNotificationCount,
+} from '../../libs/dto/notification/notification';
 import { shapeIntoMongoObjectId } from '../../libs/config';
 import { AuthMember } from '../auth/decorators/authMember.decorator';
 import { AuthGuard } from '../auth/guards/auth.guard';
@@ -22,6 +27,10 @@ export class NotificationResolver {
 	@Query(() => Int)
 	getUnreadNotificationCount(@AuthMember('_id') memberId: Types.ObjectId): Promise<number> {
 		return this.notificationService.getUnreadNotificationCount(memberId);
+	}
+	@Query(() => [UnreadNotificationCount])
+	getUnreadNotificationCounts(@AuthMember('_id') memberId: Types.ObjectId): Promise<UnreadNotificationCount[]> {
+		return this.notificationService.getUnreadNotificationCounts(memberId);
 	}
 	@Mutation(() => Notification)
 	markNotificationRead(

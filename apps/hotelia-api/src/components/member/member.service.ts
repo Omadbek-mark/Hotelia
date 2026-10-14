@@ -260,11 +260,11 @@ export class MemberService {
     return result;
   }
   
-  public async memberStatsEditor(input: StatisticModifier, session?: ClientSession): Promise<Member>{
+  public async memberStatsEditor(input: StatisticModifier, session?: ClientSession, allowInactiveOwner = false): Promise<Member>{
     const { _id, targetKey, modifier } = input;
     const result = await this.memberModel
       .findOneAndUpdate(
-        { _id, ...(targetKey === 'memberHotels' ? { memberStatus: MemberStatus.ACTIVE, memberType: MemberType.HOTEL_OWNER } : {}) },
+        { _id, ...(targetKey === 'memberHotels' ? { ...(!allowInactiveOwner || modifier >= 0 ? { memberStatus: MemberStatus.ACTIVE } : {}), memberType: MemberType.HOTEL_OWNER } : {}) },
         { $inc: { [targetKey]: modifier } },
         { new: true, session },
       )

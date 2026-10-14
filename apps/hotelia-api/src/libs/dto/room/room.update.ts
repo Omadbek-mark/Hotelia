@@ -108,7 +108,7 @@ export class AdminRoomUpdate {
 	@Field(() => String)
 	_id!: string;
 
-	@IsIn([RoomStatus.ACTIVE, RoomStatus.PAUSED])
+	@IsIn([RoomStatus.ACTIVE, RoomStatus.PAUSED, RoomStatus.DELETE])
 	@Field(() => RoomStatus)
 	roomStatus!: RoomStatus;
 }

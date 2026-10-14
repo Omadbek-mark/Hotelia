@@ -1,6 +1,8 @@
+import { ChatbotModule } from './chatbot/chatbot.module';
 import { SupportModule } from './support/support.module';
 import { BoConfigModule } from './bo-config/bo-config.module';
 import { Module } from '@nestjs/common';
+import { PaymentModule } from './payment/payment.module';
 import { HotelModule } from './hotel/hotel.module';
 import { RoomModule } from './room/room.module';
 import { BookingModule } from './booking/booking.module';
@@ -14,6 +16,8 @@ import { CommentModule } from './comment/comment.module';
 
 @Module({
 	imports: [
+		PaymentModule,
+		ChatbotModule,
 		BoConfigModule,
 		SupportModule,
 		HotelModule,

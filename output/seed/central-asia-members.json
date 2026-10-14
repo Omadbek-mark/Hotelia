@@ -1,0 +1,170 @@
+[
+  {
+    "country": "Uzbekistan",
+    "_id": "6acb4490b74f04a54db53524",
+    "memberNick": "Bobur",
+    "memberEmail": "bobur16@example.com",
+    "memberType": "HOTEL_OWNER",
+    "memberStatus": "ACTIVE",
+    "memberHotels": 2,
+    "loginVerified": true,
+    "memberImage": ""
+  },
+  {
+    "country": "Uzbekistan",
+    "_id": "6acb4490b74f04a54db53535",
+    "memberNick": "Aziz",
+    "memberEmail": "aziz16@example.com",
+    "memberType": "HOTEL_OWNER",
+    "memberStatus": "ACTIVE",
+    "memberHotels": 3,
+    "loginVerified": true,
+    "memberImage": ""
+  },
+  {
+    "country": "Uzbekistan",
+    "_id": "6acb4491b74f04a54db53546",
+    "memberNick": "Sardor",
+    "memberEmail": "sardor16@example.com",
+    "memberType": "HOTEL_OWNER",
+    "memberStatus": "DELETE",
+    "memberHotels": 0,
+    "loginVerified": false,
+    "memberImage": "",
+    "deletedAt": "2026-10-13T11:24:02.920Z"
+  },
+  {
+    "country": "Uzbekistan",
+    "_id": "6acb4491b74f04a54db53557",
+    "memberNick": "Madina",
+    "memberEmail": "madina16@example.com",
+    "memberType": "USER",
+    "memberStatus": "ACTIVE",
+    "memberHotels": 0,
+    "loginVerified": true,
+    "memberImage": ""
+  },
+  {
+    "country": "Uzbekistan",
+    "_id": "6acb4492b74f04a54db53568",
+    "memberNick": "Dilnoza",
+    "memberEmail": "dilnoza16@example.com",
+    "memberType": "USER",
+    "memberStatus": "ACTIVE",
+    "memberHotels": 0,
+    "loginVerified": true,
+    "memberImage": ""
+  },
+  {
+    "country": "Kazakhstan",
+    "_id": "6acb4492b74f04a54db53579",
+    "memberNick": "Alikhan",
+    "memberEmail": "alikhan16@example.com",
+    "memberType": "HOTEL_OWNER",
+    "memberStatus": "ACTIVE",
+    "memberHotels": 2,
+    "loginVerified": true,
+    "memberImage": ""
+  },
+  {
+    "country": "Kazakhstan",
+    "_id": "6acb4492b74f04a54db5358a",
+    "memberNick": "Nurlan",
+    "memberEmail": "nurlan16@example.com",
+    "memberType": "HOTEL_OWNER",
+    "memberStatus": "ACTIVE",
+    "memberHotels": 3,
+    "loginVerified": true,
+    "memberImage": ""
+  },
+  {
+    "country": "Kazakhstan",
+    "_id": "6acb4493b74f04a54db5359b",
+    "memberNick": "Dias",
+    "memberEmail": "dias16@example.com",
+    "memberType": "HOTEL_OWNER",
+    "memberStatus": "DELETE",
+    "memberHotels": 0,
+    "loginVerified": false,
+    "memberImage": "",
+    "deletedAt": "2026-10-13T11:24:02.920Z"
+  },
+  {
+    "country": "Kazakhstan",
+    "_id": "6acb4493b74f04a54db535ac",
+    "memberNick": "Aigerim",
+    "memberEmail": "aigerim16@example.com",
+    "memberType": "USER",
+    "memberStatus": "ACTIVE",
+    "memberHotels": 0,
+    "loginVerified": true,
+    "memberImage": ""
+  },
+  {
+    "country": "Kazakhstan",
+    "_id": "6acb4493b74f04a54db535bd",
+    "memberNick": "Aruzhan",
+    "memberEmail": "aruzhan16@example.com",
+    "memberType": "USER",
+    "memberStatus": "ACTIVE",
+    "memberHotels": 0,
+    "loginVerified": true,
+    "memberImage": ""
+  },
+  {
+    "country": "Kyrgyzstan",
+    "_id": "6acb4494b74f04a54db535ce",
+    "memberNick": "Bakyt",
+    "memberEmail": "bakyt16@example.com",
+    "memberType": "HOTEL_OWNER",
+    "memberStatus": "ACTIVE",
+    "memberHotels": 2,
+    "loginVerified": true,
+    "memberImage": ""
+  },
+  {
+    "country": "Kyrgyzstan",
+    "_id": "6acb4494b74f04a54db535df",
+    "memberNick": "Nursultan",
+    "memberEmail": "nursultan16@example.com",
+    "memberType": "HOTEL_OWNER",
+    "memberStatus": "ACTIVE",
+    "memberHotels": 3,
+    "loginVerified": true,
+    "memberImage": ""
+  },
+  {
+    "country": "Kyrgyzstan",
+    "_id": "6acb4495b74f04a54db535f0",
+    "memberNick": "Azamat",
+    "memberEmail": "azamat16@example.com",
+    "memberType": "HOTEL_OWNER",
+    "memberStatus": "DELETE",
+    "memberHotels": 0,
+    "loginVerified": false,
+    "memberImage": "",
+    "deletedAt": "2026-10-13T11:24:02.920Z"
+  },
+  {
+    "country": "Kyrgyzstan",
+    "_id": "6acb4495b74f04a54db53601",
+    "memberNick": "Aiperi",
+    "memberEmail": "aiperi16@example.com",
+    "memberType": "USER",
+    "memberStatus": "ACTIVE",
+    "memberHotels": 0,
+    "loginVerified": true,
+    "memberImage": ""
+  },
+  {
+    "country": "Kyrgyzstan",
+    "_id": "6acb4495b74f04a54db53612",
+    "memberNick": "Meerim",
+    "memberEmail": "meerim16@example.com",
+    "memberType": "USER",
+    "memberStatus": "ACTIVE",
+    "memberHotels": 0,
+    "loginVerified": true,
+    "memberImage": ""
+  }
+]

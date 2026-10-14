@@ -61,7 +61,7 @@ integration('Booking transactions against real MongoDB', () => {
 		bookings = connection.model('Booking', BookingSchema);
 		members = connection.model('Member', MemberSchema);
 		notifications = connection.model('Notification', NotificationSchema);
-		notificationService = new NotificationService(notifications, hotels);
+		notificationService = new NotificationService(notifications, hotels, members);
 		likes = connection.model('Like', LikeSchema);
 		comments = connection.model('Comment', CommentSchema);
 		follows = connection.model('Follow', FollowSchema);
@@ -69,7 +69,7 @@ integration('Booking transactions against real MongoDB', () => {
 		await follows.init();
 		await comments.init();
 		await Promise.all([hotels.init(), rooms.init(), bookings.init(), members.init(), likes.init()]);
-		likeService = new LikeService(likes, hotels, connection);
+		likeService = new LikeService(likes, hotels, connection, comments);
 		const memberService = new MemberService(members, {} as any, {} as any, {} as any, {} as any);
 		articleService = new BoardArticleService(articles, memberService, {} as any, likeService, connection);
 		followService = new FollowService(follows, memberService, members, connection);
@@ -82,8 +82,8 @@ integration('Booking transactions against real MongoDB', () => {
 			connection,
 			notificationService,
 		);
-		hotelService = new HotelService(connection, memberService, {} as any, hotels, bookings);
-		roomService = new RoomService(rooms, hotelService, connection, bookings);
+		hotelService = new HotelService(connection, memberService, {} as any, hotels, bookings, notificationService);
+		roomService = new RoomService(rooms, hotelService, connection, bookings, notificationService);
 		bookingService = new BookingService(bookings, rooms, connection, hotelService, notificationService);
 	}, 180000);
 	afterAll(async () => {
@@ -252,18 +252,21 @@ integration('Booking transactions against real MongoDB', () => {
 			{ $set: { memberHotels: 2, memberArticles: 1, memberLikes: 4, memberViews: 5 } },
 		);
 		const before = (await hotels.findById(hotelId))!.updatedAt;
-		const batch = new BatchService(hotels, members);
+		await comments.create({ memberId: guestId, commentRefId: hotelId, commentGroup: 'HOTEL', commentContent: 'A lovely stay' });
+		await comments.create({ memberId: guestId, commentRefId: hotelId, commentGroup: 'HOTEL', commentContent: 'Removed', commentStatus: 'DELETE' });
+		await comments.create({ memberId: guestId, commentRefId: hotelId, commentGroup: 'ARTICLE', commentContent: 'Other group' });
+		const batch = new BatchService(hotels, members, comments);
 		await batch.batchTopHotels();
 		await batch.batchTopOwners();
-		expect((await hotels.findById(hotelId))!.hotelRank).toBe(13);
+		expect((await hotels.findById(hotelId))!.hotelRank).toBe(4);
 		expect((await hotels.findById(hotelId))!.updatedAt).toEqual(before);
 		expect((await members.findById(ownerId))!.memberRank).toBe(24);
 		await hotels.updateOne({ _id: hotelId }, { $set: { hotelLikes: 1 } });
 		await batch.batchTopHotels();
-		expect((await hotels.findById(hotelId))!.hotelRank).toBe(9);
+		expect((await hotels.findById(hotelId))!.hotelRank).toBe(2);
 		await hotels.updateOne({ _id: hotelId }, { $set: { hotelStatus: 'PAUSED', hotelLikes: 100 } });
 		await batch.batchTopHotels();
-		expect((await hotels.findById(hotelId))!.hotelRank).toBe(9);
+		expect((await hotels.findById(hotelId))!.hotelRank).toBe(2);
 	});
 
 	it('owner reviews scope hotels before pagination and retain paused hotel history', async () => {
@@ -455,6 +458,38 @@ integration('Booking transactions against real MongoDB', () => {
 		expect(followers.list[0].followerData!.memberNick).toBe('guest');
 		expect(followers.list[0].meFollowed).toEqual([]);
 	});
+	it('updates rank for likes and plain comments, excluding removed comments and keeping views separate', async () => {
+		await hotels.updateOne({ _id: hotelId }, { $set: { hotelViews: 100, hotelRank: 999 } });
+		const comment = await commentService.createComment(guestId as any, {
+			commentGroup: CommentGroup.HOTEL, commentRefId: hotelId, commentContent: 'Beautiful place',
+		});
+		expect((await hotels.findById(hotelId))!.hotelRank).toBe(1);
+		await likeService.setHotelFavorite(guestId, hotelId, true);
+		expect((await hotels.findById(hotelId))!.hotelRank).toBe(2);
+		await likeService.setHotelFavorite(guestId, hotelId, true);
+		expect((await hotels.findById(hotelId))!.hotelRank).toBe(2);
+		await commentService.updateComment(guestId as any, { _id: comment._id, commentStatus: CommentStatus.DELETE });
+		expect((await hotels.findById(hotelId))!.hotelRank).toBe(1);
+		await likeService.setHotelFavorite(guestId, hotelId, false);
+		expect((await hotels.findById(hotelId))!.hotelRank).toBe(0);
+	});
+	it('sorts the full discovery catalog by views and current rank before taking the top four', async () => {
+		const seed = await hotels.findById(hotelId).lean();
+		await hotels.updateOne({ _id: hotelId }, { $set: { hotelViews: 100, hotelLikes: 0, hotelRank: 999 } });
+		const ids = [hotelId];
+		for (let i = 1; i <= 5; i++) {
+			const hotel = await hotels.create({ ...seed, _id: new Types.ObjectId(), hotelName: `Stay ${i}`, hotelViews: i, hotelLikes: i, hotelRank: 0 });
+			ids.push(hotel._id);
+		}
+		await comments.create({ memberId: guestId, commentRefId: ids[1], commentGroup: 'HOTEL', commentContent: 'Nice' });
+		await comments.create({ memberId: ownerId, commentRefId: ids[1], commentGroup: 'HOTEL', commentContent: 'Welcome' });
+		await comments.create({ memberId: guestId, commentRefId: hotelId, commentGroup: 'HOTEL', commentContent: 'Hidden', commentStatus: 'DELETE' });
+		const viewed = await hotelService.getHotels({ page: 1, limit: 4, sort: HotelSort.MOST_VIEWED });
+		expect(viewed.list.map((hotel) => String(hotel._id))).toEqual([ids[0], ids[5], ids[4], ids[3]].map(String));
+		const popular = await hotelService.getHotels({ page: 1, limit: 4, sort: HotelSort.MOST_POPULAR });
+		expect(popular.list.map((hotel) => String(hotel._id))).toEqual([ids[5], ids[4], ids[3], ids[1]].map(String));
+		expect(popular.list.map((hotel) => hotel.hotelRank)).toEqual([5, 4, 3, 3]);
+	});
 	it('saves a hotel only once under parallel retries and removes only the requesting member favorite', async () => {
 		await Promise.all([
 			likeService.setHotelFavorite(guestId, hotelId, true),
@@ -619,7 +654,7 @@ integration('Booking transactions against real MongoDB', () => {
 		expect(duplicate.filter((item) => item.status === 'fulfilled')).toHaveLength(1);
 		const review = await comments.findOne({ bookingId: a._id });
 		expect(
-			await notifications.countDocuments({ bookingId: a._id, notificationType: 'REVIEW', receiverId: ownerId }),
+			await notifications.countDocuments({ hotelId, notificationType: 'REVIEW', receiverId: ownerId }),
 		).toBe(1);
 		await Promise.all([
 			commentService.updateComment(guestId as any, { _id: review._id, rating: 3 }),
@@ -765,13 +800,13 @@ integration('Booking transactions against real MongoDB', () => {
 		expect(hotel!.hotelStatus === 'DELETE' && count > 0).toBe(false);
 		expect((await members.findById(ownerId))!.memberHotels).toBe(hotel!.hotelStatus === 'DELETE' ? 0 : 1);
 	}, 30000);
-	it('allows deletion after a pending hold expires without deleting booking history', async () => {
+	it('keeps new policy pending inventory reserved after the free cancellation period', async () => {
 		const booking = await bookingService.createBooking(guestId, input());
 		await bookings.updateOne({ _id: booking._id }, { $set: { expiresAt: new Date(Date.now() - 1000) } });
-		await roomService.deleteRoom(ownerId, roomId);
-		await hotelService.deleteHotel(ownerId, hotelId);
+		await expect(roomService.deleteRoom(ownerId, roomId)).rejects.toMatchObject({ status: 409 });
+		await expect(hotelService.deleteHotel(ownerId, hotelId)).rejects.toMatchObject({ status: 409 });
 		expect(await bookings.countDocuments()).toBe(1);
-		expect((await members.findById(ownerId))!.memberHotels).toBe(0);
+		expect((await members.findById(ownerId))!.memberHotels).toBe(1);
 	});
 	it('rejects booking an inactive hotel or a room without enough capacity', async () => {
 		await expect(bookingService.createBooking(guestId, input({ guests: 3 }))).rejects.toMatchObject({ status: 409 });
@@ -792,7 +827,11 @@ integration('Booking transactions against real MongoDB', () => {
 		await expect(bookingService.confirmBooking(new Types.ObjectId(), booking._id)).rejects.toMatchObject({
 			status: 404,
 		});
-		await bookings.updateOne({ _id: booking._id }, { $set: { expiresAt: new Date(Date.now() - 1) } });
+		// A legacy record has no protected freeCancellationUntil reservation.
+		await bookings.collection.updateOne(
+			{ _id: booking._id },
+			{ $set: { expiresAt: new Date(Date.now() - 1) }, $unset: { freeCancellationUntil: 1 } },
+		);
 		await bookingService.createBooking(new Types.ObjectId(), input({ rooms: 2, guests: 4 }));
 		await expect(bookingService.confirmBooking(ownerId, booking._id)).rejects.toMatchObject({ status: 409 });
 		expect((await bookings.findById(booking._id))!.bookingStatus).toBe('PENDING');

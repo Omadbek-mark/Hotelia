@@ -1,0 +1,372 @@
+{
+	"tables": {
+		"edf65d35-bd52-4c93-a199-b74bea37111b": {
+			"id": "edf65d35-bd52-4c93-a199-b74bea37111b",
+			"visible": true,
+			"name": "members",
+			"desc": "",
+			"estimatedSize": "",
+			"cols": [
+				{
+					"id": "adbcb73b-c23b-445c-8000-e3f25a60c7f1",
+					"name": "_id",
+					"datatype": "objectId",
+					"param": "",
+					"pk": true,
+					"nn": true,
+					"list": false,
+					"fk": false,
+					"comment": "",
+					"data": "",
+					"enum": "",
+					"validation": "",
+					"pattern": false,
+					"estimatedSize": "",
+					"any": ""
+				},
+				{
+					"id": "53be3a11-3dc6-46b7-8241-6e4107d3150c",
+					"name": "memberNick",
+					"datatype": "string",
+					"param": "",
+					"pk": false,
+					"nn": true,
+					"list": false,
+					"fk": false,
+					"comment": "",
+					"data": "",
+					"enum": "",
+					"validation": "",
+					"pattern": false,
+					"estimatedSize": "",
+					"any": ""
+				}
+			],
+			"relations": [
+				"a9a6265e-eca6-4365-a1e7-f45a24f6c563"
+			],
+			"lines": [],
+			"keys": [
+				{
+					"id": "70250582-f46e-4846-8416-38489f516cc9",
+					"name": "Primary",
+					"isPk": true,
+					"cols": [
+						{
+							"id": "0e03de63-3dd8-4d9b-8ca6-443fc4fc2397",
+							"colid": "adbcb73b-c23b-445c-8000-e3f25a60c7f1"
+						}
+					]
+				}
+			],
+			"indexes": [],
+			"embeddable": false,
+			"generate": true,
+			"generateCustomCode": true,
+			"customCode": "",
+			"validationLevel": "na",
+			"validationAction": "na",
+			"collation": "",
+			"others": "",
+			"size": "",
+			"max": "",
+			"validation": "",
+			"capped": false,
+			"checkConstraints": []
+		},
+		"bde8283b-c6b8-4751-92be-2ac15d2f9222": {
+			"id": "bde8283b-c6b8-4751-92be-2ac15d2f9222",
+			"visible": true,
+			"name": "hotels",
+			"desc": "",
+			"estimatedSize": "",
+			"cols": [
+				{
+					"id": "12ec5f4d-86f1-47a4-8011-179476f19a8b",
+					"name": "_id",
+					"datatype": "objectId",
+					"param": "",
+					"pk": true,
+					"nn": true,
+					"list": false,
+					"fk": false,
+					"comment": "",
+					"data": "",
+					"enum": "",
+					"validation": "",
+					"pattern": false,
+					"estimatedSize": "",
+					"any": ""
+				},
+				{
+					"id": "1cb95842-09f7-4ae1-bdf5-4cebc766d832",
+					"name": "members",
+					"datatype": "objectId",
+					"param": "",
+					"pk": false,
+					"nn": true,
+					"list": false,
+					"fk": true,
+					"comment": "",
+					"data": "",
+					"enum": "",
+					"validation": "",
+					"pattern": false,
+					"estimatedSize": "",
+					"any": ""
+				}
+			],
+			"relations": [
+				"a9a6265e-eca6-4365-a1e7-f45a24f6c563"
+			],
+			"lines": [],
+			"keys": [
+				{
+					"id": "861c6d3f-6fbe-49de-8615-a9983c12865a",
+					"name": "Primary",
+					"isPk": true,
+					"cols": [
+						{
+							"id": "77f7e738-fdf2-4266-8ce8-cf474ea2c070",
+							"colid": "12ec5f4d-86f1-47a4-8011-179476f19a8b"
+						}
+					]
+				}
+			],
+			"indexes": [],
+			"embeddable": false,
+			"generate": true,
+			"generateCustomCode": true,
+			"customCode": "",
+			"validationLevel": "na",
+			"validationAction": "na",
+			"collation": "",
+			"others": "",
+			"size": "",
+			"max": "",
+			"validation": "",
+			"capped": false,
+			"checkConstraints": []
+		}
+	},
+	"relations": {
+		"a9a6265e-eca6-4365-a1e7-f45a24f6c563": {
+			"id": "a9a6265e-eca6-4365-a1e7-f45a24f6c563",
+			"name": "members_hotels",
+			"desc": "",
+			"type": "identifying",
+			"parent_key": "70250582-f46e-4846-8416-38489f516cc9",
+			"parent": "edf65d35-bd52-4c93-a199-b74bea37111b",
+			"child": "bde8283b-c6b8-4751-92be-2ac15d2f9222",
+			"c_mp": "true",
+			"c_mch": "true",
+			"c_p": "one",
+			"c_ch": "many",
+			"c_cp": "",
+			"c_cch": "",
+			"cols": [
+				{
+					"id": "261fe3fc-a442-4b1c-af25-d7faadd19e81",
+					"parentcol": "adbcb73b-c23b-445c-8000-e3f25a60c7f1",
+					"childcol": "1cb95842-09f7-4ae1-bdf5-4cebc766d832"
+				}
+			],
+			"generate": true,
+			"generateCustomCode": true,
+			"customCode": ""
+		}
+	},
+	"notes": {
+		"862fc598-d40e-4b6f-a723-67999896ea55": {
+			"id": "862fc598-d40e-4b6f-a723-67999896ea55",
+			"visible": true,
+			"name": "Text1",
+			"desc": "<h1>Text</h1>",
+			"lines": [],
+			"type": "Note",
+			"assetCategory": "none",
+			"assetType": ""
+		}
+	},
+	"lines": {},
+	"model": {
+		"name": "Hotelia",
+		"id": "28d487a2-7e61-4a6e-a23a-aa4c5da51a5e",
+		"activeDiagram": "9294920f-7a9f-475e-a3b0-bec85381b64b",
+		"desc": "Hotelia backend MongoDB ER model — current Mongoose schemas, hotel booking, community and demo payment domains.",
+		"path": "",
+		"type": "MONGODB",
+		"version": 1,
+		"parentTableInFkCols": true,
+		"caseConvention": "under",
+		"replaceSpace": "_",
+		"color": "transparent",
+		"sideSelections": true,
+		"isDirty": true,
+		"storedin": {
+			"major": 12,
+			"minor": 6,
+			"extra": 1
+		},
+		"laststoredin": {
+			"major": 12,
+			"minor": 6,
+			"extra": 1
+		},
+		"writeFileParam": false,
+		"authorName": "",
+		"companyDetails": "",
+		"companyUrl": "",
+		"subType": "",
+		"appName": "MoonModeler",
+		"def_coltopk": true,
+		"def_validationLevel": "na",
+		"def_validationAction": "na",
+		"def_collation": "",
+		"def_others": "",
+		"connectionVersion": "",
+		"lastSaved": 1791976961941
+	},
+	"otherObjects": {},
+	"diagrams": {
+		"9294920f-7a9f-475e-a3b0-bec85381b64b": {
+			"name": "Main Diagram",
+			"description": "",
+			"id": "9294920f-7a9f-475e-a3b0-bec85381b64b",
+			"keysgraphics": true,
+			"linegraphics": "detailed",
+			"zoom": 1,
+			"background": "transparent",
+			"lineColor": "transparent",
+			"isOpen": true,
+			"main": true,
+			"diagramItems": {
+				"edf65d35-bd52-4c93-a199-b74bea37111b": {
+					"referencedItemId": "edf65d35-bd52-4c93-a199-b74bea37111b",
+					"x": 201,
+					"y": 123,
+					"gHeight": 63,
+					"gWidth": 213,
+					"color": "#ffffff",
+					"background": "#03a9f4",
+					"resized": false,
+					"autoExpand": true,
+					"backgroundOpacity": "10",
+					"collapsed": false,
+					"borderColor": "#666666",
+					"borderStyle": "none",
+					"borderWidth": 2,
+					"assetAspectRatio": "none",
+					"assetTextPosition": "right",
+					"assetShowText": true,
+					"areaHeaderDisplayed": true,
+					"areaHeaderColor": "transparent",
+					"areaHeaderBackground": "transparent",
+					"cardBackground": "transparent"
+				},
+				"bde8283b-c6b8-4751-92be-2ac15d2f9222": {
+					"referencedItemId": "bde8283b-c6b8-4751-92be-2ac15d2f9222",
+					"x": 76,
+					"y": 263,
+					"gHeight": 63,
+					"gWidth": 206,
+					"color": "#ffffff",
+					"background": "#03a9f4",
+					"resized": false,
+					"autoExpand": true,
+					"backgroundOpacity": "10",
+					"collapsed": false,
+					"borderColor": "#666666",
+					"borderStyle": "none",
+					"borderWidth": 2,
+					"assetAspectRatio": "none",
+					"assetTextPosition": "right",
+					"assetShowText": true,
+					"areaHeaderDisplayed": true,
+					"areaHeaderColor": "transparent",
+					"areaHeaderBackground": "transparent",
+					"cardBackground": "transparent"
+				},
+				"862fc598-d40e-4b6f-a723-67999896ea55": {
+					"referencedItemId": "862fc598-d40e-4b6f-a723-67999896ea55",
+					"x": 76,
+					"y": 363,
+					"gHeight": 41,
+					"gWidth": 60,
+					"color": "transparent",
+					"background": "transparent",
+					"resized": false,
+					"autoExpand": true,
+					"backgroundOpacity": "10",
+					"collapsed": false,
+					"borderColor": "#666666",
+					"borderStyle": "none",
+					"borderWidth": 2,
+					"assetAspectRatio": "none",
+					"assetTextPosition": "right",
+					"assetShowText": true,
+					"areaHeaderDisplayed": true,
+					"areaHeaderColor": "transparent",
+					"areaHeaderBackground": "transparent",
+					"cardBackground": "transparent"
+				}
+			},
+			"diagramLinks": {
+				"a9a6265e-eca6-4365-a1e7-f45a24f6c563": {
+					"referencedItemId": "a9a6265e-eca6-4365-a1e7-f45a24f6c563",
+					"color": "transparent",
+					"mode": "default",
+					"anchorStart": "default",
+					"anchorEnd": "default",
+					"anchorDetailedStart": "default",
+					"anchorDetailedEnd": "default",
+					"width": 2
+				}
+			},
+			"scroll": {
+				"x": 0,
+				"y": 0
+			},
+			"type": "erd",
+			"showHorizontal": true,
+			"showDescriptions": true,
+			"showIndicators": true,
+			"showProgress": true,
+			"lineWidth": "2",
+			"boxSize": "0",
+			"boxSpacing": "2",
+			"boxAlign": "center",
+			"showIndicatorCaptions": true,
+			"showEstimatedSize": false,
+			"showSchemaContainer": false,
+			"showEmbeddedInParents": true,
+			"showCardinalityCaptions": true,
+			"showRelationshipNames": false,
+			"showLineCaptions": true,
+			"showDependencyCaptions": false,
+			"showColumns": true,
+			"showColumnDataTypes": true,
+			"showSampleData": false,
+			"showTableIndexes": false,
+			"showTableDescriptions": false,
+			"showRelations": true,
+			"showLines": true,
+			"showDependencies": true,
+			"backgroundImage": "na",
+			"descriptionsColor": "transparent",
+			"embeddedSpacing": "2",
+			"showMainIcon": true,
+			"showLabels": true,
+			"showCustomizations": false,
+			"showExportDimensions": false,
+			"showCompleted": true,
+			"showAnimations": false
+		}
+	},
+	"diagramsOrder": [],
+	"order": [
+		"a9a6265e-eca6-4365-a1e7-f45a24f6c563"
+	],
+	"collapsedTreeItems": [],
+	"reverseStats": {}
+}

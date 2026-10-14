@@ -1,13 +1,24 @@
 import { BOOKING_CURRENCY, isUsdAmount } from '../libs/booking/money';
 import { Schema } from 'mongoose';
 import { BookingStatus } from '../libs/enums/booking.enum';
+import { PaymentMethod, PaymentStatus } from '../libs/enums/payment.enum';
 import { DAY_MS } from '../libs/booking/stay-dates';
 
 const BookingSchema = new Schema(
 	{
+		paymentMethod: { type: String, enum: PaymentMethod, immutable: true },
+		paymentStatus: { type: String, enum: PaymentStatus, immutable: true },
 		requestId: { type: String, immutable: true, lowercase: true },
 		currency: { type: String, enum: [BOOKING_CURRENCY], default: BOOKING_CURRENCY, required: true, immutable: true },
 		expiresAt: { type: Date },
+		freeCancellationUntil: { type: Date, immutable: true },
+		cancellationFeeRate: { type: Number, enum: [0, 0.05], default: 0, immutable: true },
+		cancellationFee: { type: Number, min: 0 },
+		refundAmount: { type: Number, min: 0 },
+		cancelledAt: { type: Date },
+		cancelledBy: { type: Schema.Types.ObjectId, ref: 'Member' },
+		confirmedAt: { type: Date },
+		confirmedAutomatically: { type: Boolean, default: false },
 		memberId: { type: Schema.Types.ObjectId, ref: 'Member', required: true, immutable: true },
 		hotelId: { type: Schema.Types.ObjectId, ref: 'Hotel', required: true, immutable: true },
 		roomId: { type: Schema.Types.ObjectId, ref: 'Room', required: true, immutable: true },
@@ -67,6 +78,8 @@ BookingSchema.path('nights').validate(function (value: number) {
 BookingSchema.index({ roomId: 1, bookingStatus: 1, checkIn: 1, checkOut: 1 });
 BookingSchema.index({ memberId: 1, createdAt: -1 });
 BookingSchema.index({ hotelId: 1, createdAt: -1 });
+BookingSchema.index({ bookingStatus: 1, freeCancellationUntil: 1 });
+BookingSchema.index({ bookingStatus: 1, expiresAt: 1 });
 BookingSchema.index(
 	{ memberId: 1, requestId: 1 },
 	{ unique: true, partialFilterExpression: { requestId: { $type: 'string' } } },

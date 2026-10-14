@@ -1,0 +1,328 @@
+{
+  "images": {
+    "samarkand": {
+      "path": "uploads/article/44df9a5e-497b-40e0-9c27-72bbaa12d334.jpg",
+      "source": "https://unsplash.com/photos/a-large-building-with-a-blue-sky-in-the-background-kqofi10wLeQ",
+      "license": "https://unsplash.com/license",
+      "illustrative": false
+    },
+    "astana": {
+      "path": "uploads/article/5278af17-cfa6-409c-aea1-b682b7952af2.jpg",
+      "source": "https://unsplash.com/photos/white-and-black-bridge-over-body-of-water-during-daytime-wyxTcdibez0",
+      "license": "https://unsplash.com/license",
+      "illustrative": false
+    },
+    "issyk-kul": {
+      "path": "uploads/article/ebcc16bf-e77e-4bd9-9c38-736b8c4a82fe.jpg",
+      "source": "https://unsplash.com/photos/a-landscape-with-mountains-in-the-back-ZJJ8vlEbvhM",
+      "license": "https://unsplash.com/license",
+      "illustrative": false
+    },
+    "lounge": {
+      "path": "uploads/article/4b6712f7-8aa7-4445-94cc-7a25c753aa98.jpg",
+      "source": "https://images.unsplash.com/photo-1600210492486-724fe5c67fb0",
+      "license": "https://unsplash.com/license",
+      "illustrative": true
+    },
+    "suite": {
+      "path": "uploads/article/e52111f4-aced-4b21-9ff5-93693bebcee6.jpg",
+      "source": "https://images.unsplash.com/photo-1560448204-e02f11c3d0e2",
+      "license": "https://unsplash.com/license",
+      "illustrative": true
+    },
+    "room-budget": {
+      "path": "uploads/article/f40f6366-28c2-4e10-b3bc-0e688d9d53f9.jpg",
+      "source": "https://images.unsplash.com/photo-1566665797739-1674de7a421a",
+      "license": "https://unsplash.com/license",
+      "illustrative": true
+    },
+    "room-standard": {
+      "path": "uploads/article/6fa8cbe3-0870-458b-ae27-b0cf97ccca07.jpg",
+      "source": "https://images.unsplash.com/photo-1590490360182-c33d57733427",
+      "license": "https://unsplash.com/license",
+      "illustrative": true
+    },
+    "room-simple": {
+      "path": "uploads/article/9c04fb4a-c099-4d9c-baed-b0fc024ca3f2.jpg",
+      "source": "https://images.unsplash.com/photo-1578683010236-d716f9a3f461",
+      "license": "https://unsplash.com/license",
+      "illustrative": true
+    },
+    "budget": {
+      "path": "uploads/article/67c82512-3e3d-4635-adc4-2541b351292c.jpg",
+      "source": "https://images.unsplash.com/photo-1582719478250-c89cae4dc85b",
+      "license": "https://unsplash.com/license",
+      "illustrative": true
+    }
+  },
+  "articles": [
+    {
+      "_id": "6acb537e5d62366ea708ac78",
+      "memberId": "6acb4490b74f04a54db53524",
+      "articleTitle": "Toshkent: qulay hotelni qanday tanlash kerak?",
+      "articleContent": "Toshkentda hotel tanlashda faqat narxga qaramang: metroga yaqinlik, manzil va xonadagi qulayliklarni solishtiring. Shahar bo‘ylab ko‘p yurmoqchi bo‘lsangiz, transportga qulay joylashuv sayohatni yengillashtiradi.",
+      "articleCategory": "DESTINATION_GUIDE",
+      "articleStatus": "ACTIVE",
+      "articleImage": "uploads/article/4b6712f7-8aa7-4445-94cc-7a25c753aa98.jpg",
+      "authorNick": "Bobur",
+      "verified": true
+    },
+    {
+      "_id": "6acb537e5d62366ea708ac7f",
+      "memberId": "6acb4491b74f04a54db53546",
+      "articleTitle": "Andijanga qisqa sayohat uchun reja",
+      "articleContent": "Andijanda birinchi kunni shahar sayri va mahalliy taomlarga ajrating. Hotel manzilini rejalashtirgan yo‘nalishingiz bilan solishtiring. Safar jadvalini haddan tashqari to‘ldirmay, dam olish uchun ham vaqt qoldiring.",
+      "articleCategory": "DESTINATION_GUIDE",
+      "articleStatus": "ACTIVE",
+      "articleImage": "uploads/article/f40f6366-28c2-4e10-b3bc-0e688d9d53f9.jpg",
+      "authorNick": "Sardor",
+      "verified": true
+    },
+    {
+      "_id": "6acb537e5d62366ea708ac86",
+      "memberId": "6acb4491b74f04a54db53557",
+      "articleTitle": "Samarqand: Registon va shahar sayri",
+      "articleContent": "Samarqandda Registon, Shohi Zinda va Siyob bozorini alohida vaqt bilan rejalashtiring. Piyoda sayr uchun qulay oyoq kiyim tanlang. Diniy va tarixiy maskanlarda mahalliy odob hamda tashrif qoidalariga hurmat bilan yondashing.",
+      "articleCategory": "DESTINATION_GUIDE",
+      "articleStatus": "ACTIVE",
+      "articleImage": "uploads/article/44df9a5e-497b-40e0-9c27-72bbaa12d334.jpg",
+      "authorNick": "Madina",
+      "verified": true
+    },
+    {
+      "_id": "6acb537e5d62366ea708ac8d",
+      "memberId": "6acb4492b74f04a54db53568",
+      "articleTitle": "Xorazm: Xivada shoshilmasdan sayr",
+      "articleContent": "Xivada Ichan-Qal’a ko‘chalari bo‘ylab shoshilmasdan sayr qilish uchun vaqt ajrating. Hotel manzilini eski shahar bilan solishtiring. Bir kunga ko‘p manzil qo‘shishdan ko‘ra, me’moriy detallarni kuzatib yurish maroqliroq.",
+      "articleCategory": "DESTINATION_GUIDE",
+      "articleStatus": "ACTIVE",
+      "articleImage": "uploads/article/4b6712f7-8aa7-4445-94cc-7a25c753aa98.jpg",
+      "authorNick": "Dilnoza",
+      "verified": true
+    },
+    {
+      "_id": "6acb537f5d62366ea708ac94",
+      "memberId": "6acb4492b74f04a54db53579",
+      "articleTitle": "Astana: shahar sayriga tayyorgarlik",
+      "articleContent": "Astana safarida hotel joylashuvi bilan birga ob-havo prognozini ham tekshiring. Rejadagi maskanlar orasidagi yo‘lga vaqt ajrating. Kechki sayrdan so‘ng qulay qaytish uchun transport variantlarini oldindan ko‘rib chiqing.",
+      "articleCategory": "DESTINATION_GUIDE",
+      "articleStatus": "ACTIVE",
+      "articleImage": "uploads/article/5278af17-cfa6-409c-aea1-b682b7952af2.jpg",
+      "authorNick": "Alikhan",
+      "verified": true
+    },
+    {
+      "_id": "6acb537f5d62366ea708ac9b",
+      "memberId": "6acb4493b74f04a54db5359b",
+      "articleTitle": "Almaty: shahar va tabiatni birlashtirish",
+      "articleContent": "Almaty safarini shahar sayri va tabiatga chiqish kunlariga ajrating. Har kuni hotel almashtirish shart emas: yo‘nalishga qulay bazani tanlang. Tabiatga chiqishdan oldin ob-havo va borish-qaytish rejasini tekshiring.",
+      "articleCategory": "DESTINATION_GUIDE",
+      "articleStatus": "ACTIVE",
+      "articleImage": "uploads/article/e52111f4-aced-4b21-9ff5-93693bebcee6.jpg",
+      "authorNick": "Dias",
+      "verified": true
+    },
+    {
+      "_id": "6acb537f5d62366ea708aca2",
+      "memberId": "6acb4492b74f04a54db5358a",
+      "articleTitle": "Turkistan: sokin madaniy sayohat",
+      "articleContent": "Turkistandagi tarixiy maskanlarga tashrif uchun shoshilmaydigan jadval tuzing. Hotel, transport va ovqatlanish xarajatlarini alohida rejalashtiring. Madaniy hamda diniy joylarda suratga olish qoidalarini joyida tekshiring.",
+      "articleCategory": "DESTINATION_GUIDE",
+      "articleStatus": "ACTIVE",
+      "articleImage": "uploads/article/4b6712f7-8aa7-4445-94cc-7a25c753aa98.jpg",
+      "authorNick": "Nurlan",
+      "verified": true
+    },
+    {
+      "_id": "6acb537f5d62366ea708aca9",
+      "memberId": "6acb4493b74f04a54db535ac",
+      "articleTitle": "Burabay: Akmolada tabiatga yaqin dam olish",
+      "articleContent": "Burabay — Akmola hududidagi ko‘llar va qarag‘ay o‘rmonlari bilan tanilgan dam olish yo‘nalishi. Resort tanlashda manzil, xona qulayliklari va xizmatlarni solishtiring. Faqat chiroyli rasmga qarab qaror qilmang.",
+      "articleCategory": "DESTINATION_GUIDE",
+      "articleStatus": "ACTIVE",
+      "articleImage": "uploads/article/9c04fb4a-c099-4d9c-baed-b0fc024ca3f2.jpg",
+      "authorNick": "Aigerim",
+      "verified": true
+    },
+    {
+      "_id": "6acb537f5d62366ea708acb0",
+      "memberId": "6acb4494b74f04a54db535ce",
+      "articleTitle": "Bishkek: dam olish va shahar sayri",
+      "articleContent": "Bishkekda hotelni kundalik yo‘nalishingizga qarab tanlang. Markazga yaqinlik qulay bo‘lishi mumkin, ammo narx va xona sig‘imini ham solishtiring. Birinchi kunni yengil sayrga, qolgan vaqtni rejangizdagi maskanlarga ajrating.",
+      "articleCategory": "DESTINATION_GUIDE",
+      "articleStatus": "ACTIVE",
+      "articleImage": "uploads/article/4b6712f7-8aa7-4445-94cc-7a25c753aa98.jpg",
+      "authorNick": "Bakyt",
+      "verified": true
+    },
+    {
+      "_id": "6acb537f5d62366ea708acb7",
+      "memberId": "6acb4495b74f04a54db535f0",
+      "articleTitle": "Issyk-Kul: resort tanlash uchun mezonlar",
+      "articleContent": "Issyk-Kul safarida resortning aniq manzilini, xona qulayliklarini va borish yo‘lini tekshiring. Ko‘lga yaqinlikni faqat rasmdan baholamang. Dam olish kunlarini oldindan belgilab, sanangizga mos bo‘sh xonalarni qidiring.",
+      "articleCategory": "DESTINATION_GUIDE",
+      "articleStatus": "ACTIVE",
+      "articleImage": "uploads/article/ebcc16bf-e77e-4bd9-9c38-736b8c4a82fe.jpg",
+      "authorNick": "Azamat",
+      "verified": true
+    },
+    {
+      "_id": "6acb53805d62366ea708acbe",
+      "memberId": "6acb4495b74f04a54db53601",
+      "articleTitle": "Osh: qisqa safarni qulay rejalashtirish",
+      "articleContent": "Oshga qisqa safarda markazga yaqin hotel va qulay transport muhim. Bir kunda juda ko‘p manzilni ko‘rishga urinmang. Mahalliy taomlar, shahar sayri va dam olishga alohida vaqt ajratib, safarni o‘z sur’atingizda o‘tkazing.",
+      "articleCategory": "DESTINATION_GUIDE",
+      "articleStatus": "ACTIVE",
+      "articleImage": "uploads/article/f40f6366-28c2-4e10-b3bc-0e688d9d53f9.jpg",
+      "authorNick": "Aiperi",
+      "verified": true
+    },
+    {
+      "_id": "6acb53805d62366ea708acc5",
+      "memberId": "6acb4495b74f04a54db53612",
+      "articleTitle": "Naryn: sokin sayohat uchun hotel tanlash",
+      "articleContent": "Naryn safarida hotelni keyingi yo‘nalishingizga mos tanlang. Borish-qaytish vaqtini, transport va xona sharoitlarini oldindan tekshiring. Uzoq yo‘l kunlari orasida yetarli dam olish uchun jadvalda bo‘sh vaqt qoldiring.",
+      "articleCategory": "DESTINATION_GUIDE",
+      "articleStatus": "ACTIVE",
+      "articleImage": "uploads/article/9c04fb4a-c099-4d9c-baed-b0fc024ca3f2.jpg",
+      "authorNick": "Meerim",
+      "verified": true
+    },
+    {
+      "_id": "6acb53805d62366ea708accc",
+      "memberId": "6acb4490b74f04a54db53535",
+      "articleTitle": "Arzon hotel: narxdan tashqari nimalar muhim?",
+      "articleContent": "Arzon hotel tanlashda Wi-Fi, shaxsiy hammom, xona sig‘imi va manzilni tekshiring. Transport xarajati tejalgan summani yo‘qqa chiqarishi mumkin. Kechalar va xonalar sonini to‘g‘ri kiritib, jami narxni solishtiring.",
+      "articleCategory": "TRAVEL_TIPS",
+      "articleStatus": "ACTIVE",
+      "articleImage": "uploads/article/67c82512-3e3d-4635-adc4-2541b351292c.jpg",
+      "authorNick": "Aziz",
+      "verified": true
+    },
+    {
+      "_id": "6acb53805d62366ea708acd3",
+      "memberId": "6acb4494b74f04a54db535df",
+      "articleTitle": "Bron so‘rovi va tasdiq o‘rtasidagi farq",
+      "articleContent": "Hotelia’da bron so‘rovi yuborilishi hali tasdiqlangan bron degani emas. My trips bo‘limidagi statusni kuzating: PENDING — so‘rov, CONFIRMED — tasdiq. Safardan oldin sana, mehmonlar va xonalar sonini qayta tekshiring.",
+      "articleCategory": "TRAVEL_TIPS",
+      "articleStatus": "ACTIVE",
+      "articleImage": "uploads/article/6fa8cbe3-0870-458b-ae27-b0cf97ccca07.jpg",
+      "authorNick": "Nursultan",
+      "verified": true
+    },
+    {
+      "_id": "6acb53805d62366ea708acda",
+      "memberId": "6acb4493b74f04a54db535bd",
+      "articleTitle": "Ikki kecha uchun budjetni qanday hisoblash?",
+      "articleContent": "Bir xona bir kechaga $70 bo‘lsa, ikki kecha $140; ikkita xona uchun $280 bo‘ladi. Bu faqat misol. Hotelia haqiqiy narxni backendda hisoblaydi; transport va boshqa safar xarajatlarini budjetga alohida qo‘shing.",
+      "articleCategory": "TRAVEL_TIPS",
+      "articleStatus": "ACTIVE",
+      "articleImage": "uploads/article/e52111f4-aced-4b21-9ff5-93693bebcee6.jpg",
+      "authorNick": "Aruzhan",
+      "verified": true
+    },
+    {
+      "_id": "6acb53805d62366ea708ace1",
+      "memberId": "6acb4491b74f04a54db53557",
+      "articleTitle": "Samarqandda bir kun: sayohat g‘oyasi",
+      "articleContent": "Sayohat g‘oyasi: ertalab Registonni ko‘rish, kun davomida Siyob bozoriga kirish, kechqurun esa sokin sayr. Barcha maskanlarni bir kunda tugatish shart emas. Bu shaxsiy safar hisoboti emas, reja uchun ilhom.",
+      "articleCategory": "TRAVEL_STORY",
+      "articleStatus": "ACTIVE",
+      "articleImage": "uploads/article/44df9a5e-497b-40e0-9c27-72bbaa12d334.jpg",
+      "authorNick": "Madina",
+      "verified": true
+    },
+    {
+      "_id": "6acb53815d62366ea708ace8",
+      "memberId": "6acb4490b74f04a54db53524",
+      "articleTitle": "Hotelia’da Markaziy Osiyo demo katalogi",
+      "articleContent": "Hotelia demo katalogiga O‘zbekiston, Qozog‘iston va Qirg‘izistondan 15 ta hotel va resort qo‘shildi. Har birida narxi va sig‘imi ko‘rsatilgan namunaviy xona bor. Nomlar, narxlar va rasmlar portfolio uchun demo ma’lumotlar.",
+      "articleCategory": "HOTEL_NEWS",
+      "articleStatus": "ACTIVE",
+      "articleImage": "uploads/article/6fa8cbe3-0870-458b-ae27-b0cf97ccca07.jpg",
+      "authorNick": "Bobur",
+      "verified": true
+    },
+    {
+      "_id": "6acb53815d62366ea708acef",
+      "memberId": "6acb4494b74f04a54db535df",
+      "articleTitle": "Sayohatdan qaytgach nimani yozish foydali?",
+      "articleContent": "Sayohat qaydida joylashuv, transport va xona qulayliklarini aniq tasvirlang. Shaxsiy ma’lumotlarni ulashmang. Hotel haqida review yozish uchun Hotelia’da tugallangan bron kerak; journal esa sayohat fikrlari uchun alohida bo‘lim.",
+      "articleCategory": "FREE",
+      "articleStatus": "ACTIVE",
+      "articleImage": "uploads/article/4b6712f7-8aa7-4445-94cc-7a25c753aa98.jpg",
+      "authorNick": "Nursultan",
+      "verified": true
+    }
+  ],
+  "verifiedAuthors": [
+    {
+      "memberNick": "Bobur",
+      "memberArticles": 2
+    },
+    {
+      "memberNick": "Sardor",
+      "memberArticles": 1
+    },
+    {
+      "memberNick": "Madina",
+      "memberArticles": 2
+    },
+    {
+      "memberNick": "Dilnoza",
+      "memberArticles": 1
+    },
+    {
+      "memberNick": "Alikhan",
+      "memberArticles": 1
+    },
+    {
+      "memberNick": "Dias",
+      "memberArticles": 1
+    },
+    {
+      "memberNick": "Nurlan",
+      "memberArticles": 1
+    },
+    {
+      "memberNick": "Aigerim",
+      "memberArticles": 1
+    },
+    {
+      "memberNick": "Bakyt",
+      "memberArticles": 1
+    },
+    {
+      "memberNick": "Azamat",
+      "memberArticles": 1
+    },
+    {
+      "memberNick": "Aiperi",
+      "memberArticles": 1
+    },
+    {
+      "memberNick": "Meerim",
+      "memberArticles": 1
+    },
+    {
+      "memberNick": "Aziz",
+      "memberArticles": 1
+    },
+    {
+      "memberNick": "Nursultan",
+      "memberArticles": 2
+    },
+    {
+      "memberNick": "Aruzhan",
+      "memberArticles": 1
+    }
+  ],
+  "editorialSources": [
+    "https://uzbekistan.travel/en/i/samarkand/",
+    "https://exploreuzbekistan.uz/en/sections/architecture/full/",
+    "https://kazakhstan.travel/en/regions/astana",
+    "https://kazakhstan.travel/ru/parks/burabay",
+    "https://www.visitkyrgyzstan.org/destinations/"
+  ],
+  "paginationVerified": true
+}

@@ -1,0 +1,39 @@
+{
+  "completedAt": "2026-10-13T11:24:02.920Z",
+  "transfers": [
+    {
+      "from": "Sardor",
+      "to": "Aziz",
+      "hotels": [
+        "Andijan Silk Garden"
+      ],
+      "ownerHotelCount": 3
+    },
+    {
+      "from": "Dias",
+      "to": "Nurlan",
+      "hotels": [
+        "Almaty Mountain Garden"
+      ],
+      "ownerHotelCount": 3
+    },
+    {
+      "from": "Azamat",
+      "to": "Nursultan",
+      "hotels": [
+        "Issyk-Kul Lake Retreat"
+      ],
+      "ownerHotelCount": 3
+    }
+  ],
+  "removedGeneratedFiles": 48,
+  "clearedRemainingImages": 9,
+  "deletedOwnerImages": 3,
+  "preserved": {
+    "hotels": 20,
+    "rooms": 15,
+    "bookings": 5
+  },
+  "deletion": "soft-delete (DELETE)",
+  "defaultAvatar": "/img/profile/defaultUser.svg"
+}

@@ -5,6 +5,15 @@ import { MemberPublic } from '../member/member-public';
 import { TotalCounter } from '../member/member';
 
 @ObjectType()
+export class HotelLocation {
+	@Field(() => String)
+	city!: string;
+
+	@Field(() => String)
+	country!: string;
+}
+
+@ObjectType()
 export class Hotel {
 	@Field(() => Float, { nullable: true })
 	startingPrice?: number | null;

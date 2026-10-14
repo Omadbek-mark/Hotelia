@@ -1,5 +1,6 @@
 import { NotificationService } from '../notification/notification.service';
 import { NotificationType } from '../../libs/enums/notification.enum';
+import { PaymentMethod, PaymentStatus } from '../../libs/enums/payment.enum';
 import { isUUID } from 'class-validator';
 import { BookingInput } from '../../libs/dto/booking/booking.input';
 import { Room } from '../../libs/dto/room/room';
@@ -10,11 +11,12 @@ import { BookingStatus } from '../../libs/enums/booking.enum';
 import { shapeIntoMongoObjectId } from '../../libs/config';
 import { assertNotPastCheckIn, getStayDates, hotelToday } from '../../libs/booking/stay-dates';
 import { MemberType } from '../../libs/enums/member.enum';
-import { BOOKING_CURRENCY, bookingPrice } from '../../libs/booking/money';
+import { BOOKING_CURRENCY, bookingPrice, cancellationAmounts } from '../../libs/booking/money';
 import { OwnerDashboard } from '../../libs/dto/booking/owner-dashboard';
 import { PENDING_HOLD_MS } from '../../libs/booking/inventory';
-import { availableRoomsPipeline } from '../../libs/booking/availability-pipeline';
-import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { availableRoomsPipeline, roomInventoryPipeline } from '../../libs/booking/availability-pipeline';
+import { BadRequestException, ConflictException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { Interval } from '@nestjs/schedule';
 import { InjectConnection, InjectModel } from '@nestjs/mongoose';
 import { Connection, FilterQuery, Model, PipelineStage, Types } from 'mongoose';
 import { Booking, Bookings } from '../../libs/dto/booking/booking';
@@ -23,6 +25,8 @@ import { Message } from '../../libs/enums/common.enum';
 
 @Injectable()
 export class BookingService {
+	private readonly logger = new Logger(BookingService.name);
+	private confirmingDueBookings = false;
 	constructor(
 		@InjectModel('Booking') private readonly bookingModel: Model<Booking>,
 		@InjectModel('Room') private readonly roomModel: Model<Room>,
@@ -32,6 +36,11 @@ export class BookingService {
 	) {}
 
 	public async createBooking(memberId: Types.ObjectId, input: BookingInput): Promise<Booking> {
+		if ((input.paymentMethod ?? PaymentMethod.CEO_BANK_ACCOUNT) !== PaymentMethod.CEO_BANK_ACCOUNT) {
+			throw new BadRequestException(
+				'Bank card payments are not activated. Please use the demo CEO bank account option.',
+			);
+		}
 		const roomId = shapeIntoMongoObjectId(input.roomId);
 		const stay = getStayDates(input.checkIn, input.checkOut);
 		if (
@@ -71,6 +80,7 @@ export class BookingService {
 						.exec();
 					if (!room) throw new NotFoundException(Message.NO_DATA_FOUND);
 					const now = new Date();
+					const freeCancellationUntil = new Date(now.getTime() + PENDING_HOLD_MS);
 					assertNotPastCheckIn(stay.checkIn, hotel.hotelTimezone, now);
 					const price = bookingPrice(room.roomPrice, stay.nights, input.rooms);
 					const inquiry = { ...input, hotelId: String(hotel._id), page: 1, limit: 1, sort: RoomSort.NEWEST };
@@ -94,7 +104,12 @@ export class BookingService {
 								rooms: input.rooms,
 								...price,
 								bookingStatus: BookingStatus.PENDING,
-								expiresAt: new Date(now.getTime() + PENDING_HOLD_MS),
+								expiresAt: freeCancellationUntil,
+								freeCancellationUntil,
+								cancellationFeeRate: 0.05,
+								paymentMethod: PaymentMethod.CEO_BANK_ACCOUNT,
+								paymentStatus: PaymentStatus.DEMO_ONLY,
+								createdAt: now,
 							},
 						],
 						{ session },
@@ -128,27 +143,112 @@ export class BookingService {
 	}
 
 	public async confirmBooking(ownerId: Types.ObjectId, bookingId: Types.ObjectId): Promise<Booking> {
+		return this.confirmPendingBooking(ownerId, bookingId, false);
+	}
+
+	// Runs in the API process so auto-confirm does not depend on starting the batch app.
+	@Interval(10000)
+	public async confirmDueBookings(): Promise<void> {
+		if (this.confirmingDueBookings) return;
+		this.confirmingDueBookings = true;
+		try {
+			const now = new Date();
+			const due = await this.bookingModel
+				.find({
+					bookingStatus: BookingStatus.PENDING,
+					freeCancellationUntil: { $lte: now },
+				})
+				.select('_id hotelId')
+				.sort({ freeCancellationUntil: 1 })
+				.limit(100)
+				.lean()
+				.exec();
+			// Recover older pending holds without retroactively charging the new fee policy.
+			const legacy = await this.bookingModel
+				.find({
+					bookingStatus: BookingStatus.PENDING,
+					freeCancellationUntil: null,
+					expiresAt: { $lte: now },
+					checkIn: { $gte: hotelToday('UTC', now) },
+				})
+				.select('_id hotelId')
+				.sort({ expiresAt: 1 })
+				.limit(25)
+				.lean()
+				.exec();
+			for (const booking of [...due, ...legacy]) {
+				try {
+					const hotel = await this.hotelService.getHotelByAdmin(booking.hotelId);
+					await this.confirmPendingBooking(hotel.ownerId, booking._id, true);
+				} catch (error) {
+					this.logger.error(
+						`Automatic confirmation failed for ${booking._id}`,
+						error instanceof Error ? error.message : 'Unknown error',
+					);
+				}
+			}
+		} catch (error) {
+			this.logger.error(
+				'Could not load bookings for automatic confirmation',
+				error instanceof Error ? error.message : 'Unknown error',
+			);
+		} finally {
+			this.confirmingDueBookings = false;
+		}
+	}
+
+	private async confirmPendingBooking(
+		ownerId: Types.ObjectId,
+		bookingId: Types.ObjectId,
+		automatic: boolean,
+	): Promise<Booking> {
 		const target = await this.bookingModel.findById(bookingId).lean().exec();
 		if (!target) throw new NotFoundException(Message.NO_DATA_FOUND);
 		return await this.connection.transaction(async (session) => {
-			// Share the hotel lock with new bookings and inventory changes before checking expiry.
+			// Shared lock and an inventory recheck also protect older expired holds from overbooking.
 			const hotel = await this.hotelService.lockBookingHotel(target.hotelId, session, ownerId);
 			const now = new Date();
+			const current = await this.bookingModel.findById(bookingId).session(session).lean().exec();
+			if (!current) throw new NotFoundException(Message.NO_DATA_FOUND);
+			if (automatic && current.bookingStatus !== BookingStatus.PENDING) return current;
+			if (current.bookingStatus !== BookingStatus.PENDING)
+				throw new ConflictException('Only pending bookings can be confirmed');
+			if (!automatic) assertNotPastCheckIn(current.checkIn, hotel.hotelTimezone, now);
+			const autoConfirmAt = current.freeCancellationUntil ?? current.expiresAt;
+			if (automatic && (!autoConfirmAt || autoConfirmAt > now)) return current;
+			if (automatic && !current.freeCancellationUntil && current.checkIn < hotelToday(hotel.hotelTimezone, now))
+				return current;
+			const stay = { checkIn: current.checkIn, checkOut: current.checkOut, nights: current.nights };
+			const [availability] = await this.roomModel
+				.aggregate<Room>([
+					{
+						$match: {
+							_id: current.roomId,
+							hotelId: hotel._id,
+							roomStatus: { $in: [RoomStatus.ACTIVE, RoomStatus.PAUSED] },
+							roomCapacity: { $gte: Math.ceil(current.guests / current.rooms) },
+						},
+					},
+					...roomInventoryPipeline({ rooms: current.rooms }, stay, now, current._id),
+				])
+				.session(session)
+				.exec();
+			if (!availability) throw new ConflictException('Not enough available rooms to confirm this booking');
 			const result = await this.bookingModel
 				.findOneAndUpdate(
 					{
 						_id: bookingId,
 						bookingStatus: BookingStatus.PENDING,
-						checkIn: { $gte: hotelToday(hotel.hotelTimezone, now) },
-						$or: [{ expiresAt: { $gt: now } }, { expiresAt: null }],
 					},
-					{ $set: { bookingStatus: BookingStatus.CONFIRMED }, $unset: { expiresAt: 1 } },
+					{
+						$set: { bookingStatus: BookingStatus.CONFIRMED, confirmedAt: now, confirmedAutomatically: automatic },
+						$unset: { expiresAt: 1 },
+					},
 					{ new: true, runValidators: true, session },
 				)
 				.exec();
-			if (!result)
-				throw new ConflictException('Only an unexpired pending booking with a non-past check-in can be confirmed');
-			await this.notificationService.notify(NotificationType.BOOKING_CONFIRMED, ownerId, result, session);
+			if (!result) throw new ConflictException('Only pending bookings can be confirmed');
+			await this.notificationService.notify(NotificationType.BOOKING_CONFIRMED, ownerId, result, session, automatic);
 			return result;
 		});
 	}
@@ -164,7 +264,7 @@ export class BookingService {
 			if (memberType !== MemberType.HOTEL_OWNER) throw new NotFoundException(Message.NO_DATA_FOUND);
 			await this.hotelService.getOwnerHotel(memberId, booking.hotelId);
 		}
-		return this.cancelPendingOrConfirmedBooking(bookingId, memberId);
+		return this.cancelPendingOrConfirmedBooking(bookingId, memberId, booking.memberId.equals(memberId));
 	}
 
 	public async cancelBookingByAdmin(bookingId: Types.ObjectId, memberId: Types.ObjectId): Promise<Booking> {
@@ -173,13 +273,33 @@ export class BookingService {
 		return this.cancelPendingOrConfirmedBooking(bookingId, memberId);
 	}
 
-	private async cancelPendingOrConfirmedBooking(bookingId: Types.ObjectId, memberId: Types.ObjectId): Promise<Booking> {
+	private async cancelPendingOrConfirmedBooking(
+		bookingId: Types.ObjectId,
+		memberId: Types.ObjectId,
+		byGuest = false,
+	): Promise<Booking> {
 		// The status filter prevents overwriting completion; notification shares the transaction.
 		return this.connection.transaction(async (session) => {
+			const current = await this.bookingModel
+				.findOne({ _id: bookingId, bookingStatus: { $in: [BookingStatus.PENDING, BookingStatus.CONFIRMED] } })
+				.session(session)
+				.lean()
+				.exec();
+			if (!current) throw new ConflictException('Only pending or confirmed bookings can be cancelled');
+			const now = new Date();
+			const chargeFee =
+				byGuest &&
+				current.cancellationFeeRate === 0.05 &&
+				!!current.freeCancellationUntil &&
+				now >= current.freeCancellationUntil;
+			const amounts = cancellationAmounts(current.totalPrice, chargeFee);
 			const result = await this.bookingModel
 				.findOneAndUpdate(
 					{ _id: bookingId, bookingStatus: { $in: [BookingStatus.PENDING, BookingStatus.CONFIRMED] } },
-					{ $set: { bookingStatus: BookingStatus.CANCELLED }, $unset: { expiresAt: 1 } },
+					{
+						$set: { bookingStatus: BookingStatus.CANCELLED, ...amounts, cancelledAt: now, cancelledBy: memberId },
+						$unset: { expiresAt: 1 },
+					},
 					{ new: true, runValidators: true, session },
 				)
 				.exec();
@@ -207,6 +327,7 @@ export class BookingService {
 				.exec();
 			if (!result)
 				throw new ConflictException('Only confirmed bookings whose check-out date has arrived can be completed');
+			await this.notificationService.notify(NotificationType.BOOKING_COMPLETED, ownerId, result, session);
 			return result;
 		});
 	}

@@ -40,12 +40,12 @@ export class OwnerReviewsInquiry {
 
 @InputType()
 export class CommentInput {
-	@ValidateIf((input, value) => input.commentGroup === CommentGroup.HOTEL || value !== undefined)
+	@ValidateIf((input, value) => value !== undefined || input.rating !== undefined)
 	@IsMongoId()
 	@Field(() => String, { nullable: true })
 	bookingId?: string;
 
-	@ValidateIf((input, value) => input.commentGroup === CommentGroup.HOTEL || value !== undefined)
+	@ValidateIf((input, value) => value !== undefined || input.bookingId !== undefined)
 	@IsInt()
 	@Min(1)
 	@Max(5)
