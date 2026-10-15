@@ -5,7 +5,7 @@
 - `createBooking(input: BookingInput!)` requires authentication and creates a PENDING reservation.
 - Payment defaults to `CEO_BANK_ACCOUNT` and is stored as `DEMO_ONLY`; no bank transfer or real charge occurs. `BANK_CARD` is rejected while verification and the provider are unavailable, even if a pending demo card is saved in the private profile payment module.
 - `confirmBooking(bookingId)` and `completeBooking(bookingId)` require HOTEL_OWNER role and ownership of the booking's hotel.
-- `cancelBooking(bookingId)` requires authentication and permits the booking member or that hotel's owner. ADMIN does not bypass ownership.
+- `cancelBooking(bookingId)` requires authentication and permits the booking member or that hotel's owner. ADMIN uses the separate guarded admin cancellation API; the ordinary cancel operation does not bypass ownership.
 - `getBooking(bookingId)` and `getMyBookings(input)` require authentication and return only the requesting member's bookings. Hotel owners and admins do not gain access to other members' reservations through these queries.
 - `getOwnerBooking(bookingId)` and `getOwnerBookings(input: OwnerBookingsInquiry!)` require HOTEL_OWNER role. They return reservations only for hotels currently owned by that member, including PAUSED and soft-deleted hotels for historical visibility. Missing/foreign detail returns NotFound; a foreign hotel filter returns an empty list.
 - `getAvailableRooms(input)` is public and read-only. It is an estimate at query time, not an inventory hold.
@@ -35,7 +35,7 @@
 
 - All room prices are USD. New room prices accept at most two decimal places; extra decimal places are rejected rather than silently rounded.
 - The server loads the current room price and computes `totalPrice = pricePerNight × nights × rooms` in integer cents. Overflow or loss of cent precision is rejected.
-- `currency`, `pricePerNight`, `totalPrice`, and `nights` are server-owned snapshots. Later room price changes do not change existing booking prices. No tax, discount or payment calculation is included yet.
+- `currency`, `pricePerNight`, `totalPrice`, and `nights` are server-owned snapshots. Later room price changes do not change existing booking prices. There is no real payment provider or tax/discount calculation. Demo payment snapshots and cancellation fee/refund amounts are recorded.
 - Existing room values are not converted from another currency. Any pre-existing data must represent USD and meet the new precision rule.
 
 ## Retry safety
@@ -60,7 +60,7 @@
 - PENDING / CONFIRMED → CANCELLED: the booking member, hotel owner, or admin. Guest cancellation before `freeCancellationUntil` is free; at or after the deadline a 5% compensation is rounded to USD cents. The remaining amount is recorded as `refundAmount`. Owner/admin cancellation is fee-free. Legacy bookings have no retroactive fee. Status, fee/refund amounts, cancellation time/actor and notifications are saved together. No payment-provider charge or refund is executed yet.
 - CONFIRMED → COMPLETED: only the hotel owner, on or after the hotel-local check-out calendar date. There is no check-out time-of-day setting yet. A pending booking cannot be marked completed.
 - CANCELLED and COMPLETED are terminal. Repeating a transition returns Conflict rather than reopening or changing the booking. The `requestId` retry behavior for creation remains unchanged.
-- Confirmation and completion share the existing hotel transaction lock. Cancellation releases inventory using an atomic status-filtered update; it cannot overwrite completion, and a concurrent confirmation cannot resurrect a cancellation. No extra transaction is needed for this single-document release.
+- Confirmation and completion share the existing hotel transaction lock. Cancellation uses a status-filtered update and persists its notification in the same transaction; it cannot overwrite completion, and a concurrent confirmation cannot resurrect a cancellation.
 - Owner operations require a nondeleted owned hotel. The member may cancel their own eligible booking even if its hotel was subsequently soft-deleted.
 
 ## Validation

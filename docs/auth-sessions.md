@@ -34,10 +34,10 @@ mutation Logout {
 
 Logout uchun Authorization: Bearer <accessToken> headeri kerak.
 Refresh uchun access token talab qilinmaydi. Tokenlarni literal query matniga yozish orniga variables ishlating.
-Frontend ulanayotganda refresh token transportini HttpOnly/Secure cookiega otkazamiz,
-Origin/CSRF va aniq CORS sozlamalarini ham shu paytda birga tekshiramiz.
-Hozir cookie ishlatilmaydi; raw refresh token faqat signup/login/refresh javobida beriladi,
-Member hujjatiga yozilmaydi. Browser localStorageda saqlash ushbu dizaynning tavsiyasi emas.
+Hozir cookie ishlatilmaydi: frontend access/refresh tokenlarni localStorage’da saqlaydi.
+Raw refresh token signup/login/refresh javobida beriladi, Member hujjatiga yozilmaydi.
+HttpOnly/Secure cookie va unga bog‘liq Origin/CSRF/CORS o‘zgarishlari hozir joriy
+qilingan emas; bu alohida kelishiladigan yaxshilash bosqichi.
 
 ## Moslik va chegaralar
 
