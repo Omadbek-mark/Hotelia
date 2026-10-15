@@ -1,0 +1,75 @@
+name: Hotelia backend CI
+
+on:
+  push:
+    branches: [develop, master]
+  pull_request:
+    branches: [master]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: backend-ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm test -- --runInBand --watchman=false
+      - run: npx tsc --noEmit -p apps/hotelia-api/tsconfig.app.json
+      - run: npx tsc --noEmit -p apps/hotelia-batch/tsconfig.app.json
+
+  docker-build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build API image
+        run: docker build --build-arg APP_NAME=hotelia-api -t hotelia-api:ci .
+      - name: Build batch image
+        run: docker build --build-arg APP_NAME=hotelia-batch -t hotelia-batch:ci .
+
+  deploy:
+    needs: [validate, docker-build]
+    if: >-
+      github.event_name == 'push' &&
+      github.ref == 'refs/heads/master' &&
+      vars.COOLIFY_URL != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 75
+    environment: production
+    concurrency:
+      group: backend-deploy-production
+      cancel-in-progress: false
+    env:
+      COOLIFY_URL: ${{ vars.COOLIFY_URL }}
+      COOLIFY_TOKEN: ${{ secrets.COOLIFY_TOKEN }}
+      API_UUID: ${{ vars.COOLIFY_API_UUID }}
+      BATCH_UUID: ${{ vars.COOLIFY_BATCH_UUID }}
+      API_SMOKE_URL: ${{ vars.API_SMOKE_URL }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check deployment configuration before updating either application
+        run: |
+          test -n "$COOLIFY_TOKEN"
+          test -n "$API_UUID"
+          test -n "$BATCH_UUID"
+          test -n "$API_SMOKE_URL"
+      - name: Deploy API and check public endpoint
+        env:
+          APP_UUID: ${{ env.API_UUID }}
+          SMOKE_URL: ${{ env.API_SMOKE_URL }}
+        run: bash .github/scripts/coolify-deploy.sh
+      - name: Deploy batch (internal service, Coolify health check)
+        env:
+          APP_UUID: ${{ env.BATCH_UUID }}
+        run: bash .github/scripts/coolify-deploy.sh
