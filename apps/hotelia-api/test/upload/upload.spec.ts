@@ -2,7 +2,7 @@ import 'reflect-metadata';
 import { ValidationPipe } from '@nestjs/common';
 import { Readable } from 'stream';
 import { mkdir, readdir, readFile, unlink } from 'fs/promises';
-import type { FileUpload } from 'graphql-upload';
+import type { FileUpload } from 'graphql-upload-ts';
 import { saveImage, saveImages } from '../../src/libs/upload';
 import { MemberResolver } from '../../src/components/member/member.resolver';
 

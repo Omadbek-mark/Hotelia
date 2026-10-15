@@ -1,6 +1,6 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectConnection, InjectModel } from '@nestjs/mongoose';
-import { Error as MongooseError, ClientSession, Connection, FilterQuery, Model, PipelineStage, Types } from 'mongoose';
+import { Error as MongooseError, ClientSession, type Connection, FilterQuery, Model, PipelineStage, Types } from 'mongoose';
 import { Booking } from '../../libs/dto/booking/booking';
 import { inventoryBookingFilter } from '../../libs/booking/inventory';
 import { Hotel, Hotels, HotelLocation } from '../../libs/dto/hotel/hotel';

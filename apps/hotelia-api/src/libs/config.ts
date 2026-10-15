@@ -9,7 +9,7 @@ export const availableBoardArticleSorts = ['createdAt', 'updatedAt', 'articleLik
 export const availableCommentSorts = ['createdAt', 'updatedAt'];
 
 //** IMAGE CONFIGURATION **/
-import { v4 as uuidv4 } from 'uuid';
+import { randomUUID } from 'crypto';
 import * as path from 'path';
 import { Types } from 'mongoose';
 import { T } from './types/common';
@@ -17,7 +17,7 @@ import { T } from './types/common';
 export const validMimeTypes = ['image/png', 'image/jpg', 'image/jpeg'];
 export const getSerialForImage = (filename: string) => {
 	const ext = path.parse(filename).ext;
-	return uuidv4() + ext;
+	return randomUUID() + ext;
 };
 
 export const shapeIntoMongoObjectId = (target: any) => {

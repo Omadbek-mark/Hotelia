@@ -10,7 +10,7 @@ import NotificationSchema from '../../src/schemas/Notification.model';
 import { NotificationService } from '../../src/components/notification/notification.service';
 import { BatchService } from '../../../hotelia-batch/src/batch.service';
 import { randomUUID } from 'crypto';
-import { createConnection, Connection, Model, Types } from 'mongoose';
+import { createConnection, type Connection, Model, Types } from 'mongoose';
 import { MongoMemoryReplSet } from 'mongodb-memory-server';
 import HotelSchema from '../../src/schemas/Hotel.model';
 import RoomSchema from '../../src/schemas/Room.model';

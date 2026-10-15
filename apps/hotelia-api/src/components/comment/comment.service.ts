@@ -8,7 +8,7 @@ import {
 	NotFoundException,
 } from '@nestjs/common';
 import { InjectConnection, InjectModel } from '@nestjs/mongoose';
-import { ClientSession, Connection, Model, ObjectId, PipelineStage } from 'mongoose';
+import { ClientSession, type Connection, Model, ObjectId, PipelineStage } from 'mongoose';
 import { Booking } from '../../libs/dto/booking/booking';
 import { Hotel } from '../../libs/dto/hotel/hotel';
 import { BookingStatus } from '../../libs/enums/booking.enum';

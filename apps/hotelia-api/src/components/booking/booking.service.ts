@@ -18,7 +18,7 @@ import { availableRoomsPipeline, roomInventoryPipeline } from '../../libs/bookin
 import { BadRequestException, ConflictException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { Interval } from '@nestjs/schedule';
 import { InjectConnection, InjectModel } from '@nestjs/mongoose';
-import { Connection, FilterQuery, Model, PipelineStage, Types } from 'mongoose';
+import { type Connection, FilterQuery, Model, PipelineStage, Types } from 'mongoose';
 import { Booking, Bookings } from '../../libs/dto/booking/booking';
 import { BookingsInquiry, OwnerBookingsInquiry, AllBookingsInquiry } from '../../libs/dto/booking/booking.inquiry';
 import { Message } from '../../libs/enums/common.enum';

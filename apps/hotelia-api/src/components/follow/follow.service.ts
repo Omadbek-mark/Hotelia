@@ -1,5 +1,5 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
-import { Connection, Model, ObjectId } from 'mongoose';
+import { type Connection, Model, ObjectId } from 'mongoose';
 import { MemberService } from '../member/member.service';
 import { InjectConnection, InjectModel } from '@nestjs/mongoose';
 import { Follower, Followers, Following, Followings } from '../../libs/dto/follow/follow';

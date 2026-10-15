@@ -5,7 +5,7 @@ import { assertNotPastCheckIn, getStayDates } from '../../libs/booking/stay-date
 import { availableRoomsPipeline } from '../../libs/booking/availability-pipeline';
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectConnection, InjectModel } from '@nestjs/mongoose';
-import { Error as MongooseError, Connection, FilterQuery, Model, Types } from 'mongoose';
+import { Error as MongooseError, type Connection, FilterQuery, Model, Types } from 'mongoose';
 import { Room, Rooms } from '../../libs/dto/room/room';
 import { OwnerRoomsInquiry, RoomsInquiry, AllRoomsInquiry } from '../../libs/dto/room/room.inquiry';
 import { AdminRoomUpdate, RoomUpdate } from '../../libs/dto/room/room.update';

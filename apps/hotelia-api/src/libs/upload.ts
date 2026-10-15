@@ -3,8 +3,8 @@ import { createWriteStream } from 'fs';
 import { mkdir, unlink } from 'fs/promises';
 import { Transform } from 'stream';
 import { pipeline } from 'stream/promises';
-import type { FileUpload } from 'graphql-upload';
-import { v4 as uuidv4 } from 'uuid';
+import type { FileUpload } from 'graphql-upload-ts';
+import { randomUUID } from 'crypto';
 
 const imageExtensions: Record<string, string> = {
 	'image/png': '.png',
@@ -18,7 +18,7 @@ export async function saveImage(file: FileUpload, target: string): Promise<strin
 	if (!extension) throw new BadRequestException('Please provide JPG, JPEG, PNG or WebP images!');
 	const directory = `uploads/${target}`;
 	await mkdir(directory, { recursive: true });
-	const url = `${directory}/${uuidv4()}${extension}`;
+	const url = `${directory}/${randomUUID()}${extension}`;
 	let header = Buffer.alloc(0);
 	let validated = false;
 	const validation = new Transform({

@@ -12,7 +12,8 @@ import { RolesGuard } from '../auth/guards/roles.guard';
 import { AdminMemberUpdate, MemberUpdate } from '../../libs/dto/member/member.update';
 import { getSerialForImage, shapeIntoMongoObjectId, validMimeTypes } from '../../libs/config';
 import { WithoutGuard } from '../auth/guards/without.guard';
-import { GraphQLUpload, FileUpload } from 'graphql-upload';
+import { GraphQLUpload } from 'graphql-upload-ts';
+import type { FileUpload } from 'graphql-upload-ts';
 import { saveImage, saveImages } from '../../libs/upload';
 import { Message } from '../../libs/enums/common.enum';
 

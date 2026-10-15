@@ -21,6 +21,12 @@
     "noImplicitAny": false,
     "strictBindCallApply": false,
     "noFallthroughCasesInSwitch": false,
-    "paths": {}
+    "paths": {},
+    "ignoreDeprecations": "6.0",
+    "types": [
+      "node",
+      "jest"
+    ],
+    "rootDir": "."
   }
 }
