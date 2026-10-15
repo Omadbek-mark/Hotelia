@@ -1,66 +1,75 @@
 import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model, ObjectId } from 'mongoose';
+import { Model } from 'mongoose';
 import { View } from '../../libs/dto/view/view';
 import { ViewInput } from '../../libs/dto/view/view.input';
-import { T } from '../../libs/types/common';
-import { Properties } from '../../libs/dto/property/property';
-import { OrdinaryInquiry } from '../../libs/dto/property/property.input';
+import { Types } from 'mongoose';
 import { ViewGroup } from '../../libs/enums/view.enum';
-import { lookupVisit } from '../../libs/config';
+import { HotelStatus } from '../../libs/enums/hotel.enum';
+import { Hotels } from '../../libs/dto/hotel/hotel';
+import { VisitedInquiry } from '../../libs/dto/view/visited.inquiry';
 
 @Injectable()
 export class ViewService {
-  constructor(@InjectModel('View') private readonly viewModel: Model<View>) { }
-  
-  public async recordView(input: ViewInput): Promise<View | null> {
-    const viewExist = await this.checkViewExistence(input);
-    if (!viewExist) {
-      console.log("- New View Insert -");
-      return await this.viewModel.create(input);
-    } else return null;
-  }
+	constructor(@InjectModel('View') private readonly viewModel: Model<View>) {}
 
-  private async checkViewExistence(input: ViewInput): Promise<View | null> {
-    const { memberId, viewRefId } = input;
-    const search: T = { memberId: memberId, viewRefId: viewRefId };
-    return await this.viewModel.findOne(search).exec();
-  }
+	public async recordView(input: ViewInput): Promise<View | null> {
+		const viewExist = await this.checkViewExistence(input);
+		if (viewExist) {
+			await this.touchHotelView(input);
+			return null;
+		}
 
-  public async getVisitedProperties(memberId: ObjectId, input: OrdinaryInquiry): Promise<Properties> {
-      const { page, limit } = input;
-      const match: T = { viewGroup: ViewGroup.PROPERTY, memberId: memberId };
-  
-      const data: T = await this.viewModel
-        .aggregate([
-          { $match: match },
-          { $sort: { updatedAt: -1 } },
-          {
-            $lookup: {
-              from: 'properties',
-              localField: 'viewRefId',
-              foreignField: '_id',
-              as: 'visitedProperty',
-            },
-          },
-          { $unwind: '$visitedProperty' },
-          {
-            $facet: {
-              list: [
-                { $skip: (page - 1) * limit },
-                { $limit: limit },
-                lookupVisit,
-                {$unwind: '$visitedProperty.memberData'},
-              ],
-              metaCounter: [{ $count: 'total' }],
-            },
-          },
-        ])
-        .exec();
-  
-      const result: Properties = { list: [], metaCounter: data[0].metaCounter };
-      result.list = data[0].list.map((ele) => ele.visitedProperty);
-      console.log('result:', result);
-      return result;
-    }
+		try {
+			return await this.viewModel.create(input);
+		} catch (err) {
+			// Another request may have inserted this view after our existence check.
+			// The unique index allows only one winner to increment the counter.
+			if ((err as { code?: number })?.code === 11000) {
+				await this.touchHotelView(input);
+				return null;
+			}
+			throw err;
+		}
+	}
+
+	private async touchHotelView(input: ViewInput): Promise<void> {
+		if (input.viewGroup === ViewGroup.HOTEL)
+			await this.viewModel.updateOne(input, { $set: { updatedAt: new Date() } }, { timestamps: false }).exec();
+	}
+
+	public async getVisitedHotels(memberId: Types.ObjectId, input: VisitedInquiry): Promise<Hotels> {
+		const [result] = await this.viewModel
+			.aggregate<Hotels>([
+				{ $match: { memberId, viewGroup: ViewGroup.HOTEL } },
+				{ $sort: { updatedAt: -1, _id: -1 } },
+				{
+					$lookup: {
+						from: 'hotels',
+						localField: 'viewRefId',
+						foreignField: '_id',
+						as: 'hotel',
+						pipeline: [{ $match: { hotelStatus: HotelStatus.ACTIVE } }],
+					},
+				},
+				{ $unwind: '$hotel' },
+				{
+					$facet: {
+						list: [
+							{ $skip: (input.page - 1) * input.limit },
+							{ $limit: input.limit },
+							{ $replaceRoot: { newRoot: '$hotel' } },
+						],
+						metaCounter: [{ $count: 'total' }],
+					},
+				},
+			])
+			.exec();
+		return result ?? { list: [], metaCounter: [] };
+	}
+
+	private async checkViewExistence(input: ViewInput): Promise<View | null> {
+		const { memberId, viewRefId, viewGroup } = input;
+		return await this.viewModel.findOne({ memberId, viewRefId, viewGroup }).exec();
+	}
 }

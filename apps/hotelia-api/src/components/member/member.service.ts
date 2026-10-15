@@ -1,9 +1,10 @@
-import { BadRequestException, ConflictException, ForbiddenException, Injectable, InternalServerErrorException } from '@nestjs/common';
+import { MemberPublic } from '../../libs/dto/member/member-public';
+import { escapeSearchText } from '../../libs/search';
+import { BadRequestException, ConflictException, ForbiddenException, Injectable, InternalServerErrorException, UnauthorizedException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model, ObjectId } from 'mongoose';
+import { ClientSession, Model, ObjectId, Types } from 'mongoose';
 import { Member, Members } from '../../libs/dto/member/member';
-import { AgentsInquiry, LoginInput, MemberInput, MembersInquiry } from '../../libs/dto/member/member.input';
-import { exec } from 'child_process';
+import { HotelOwnersInquiry, LoginInput, MemberInput, MembersInquiry } from '../../libs/dto/member/member.input';
 import { MemberAuthType, MemberStatus, MemberType } from '../../libs/enums/member.enum';
 import { Direction, Message } from '../../libs/enums/common.enum';
 import { AuthService } from '../auth/auth.service';
@@ -11,12 +12,11 @@ import { AdminMemberUpdate, MemberUpdate } from '../../libs/dto/member/member.up
 import { StatisticModifier, T } from '../../libs/types/common';
 import { ViewService } from '../view/view.service';
 import { ViewGroup } from '../../libs/enums/view.enum';
-import { retry } from 'rxjs';
 import { LikeGroup } from '../../libs/enums/like.enum';
 import { LikeInput } from '../../libs/dto/like/like.input';
 import { LikeService } from '../like/like.service';
 import { Follower, Following, MeFollowed } from '../../libs/dto/follow/follow';
-import { lookupAuthMemberLiked } from '../../libs/config';
+import { lookupAuthMemberLiked, lookupAuthMemberFollowed } from '../../libs/config';
 
 @Injectable()
 export class MemberService {
@@ -48,7 +48,7 @@ export class MemberService {
     } catch (err) {
       this.rethrowMemberWriteError(err);
     }
-    result!.accessToken = await this.authService.createToken(result!);
+    Object.assign(result!, await this.authService.createSession(result!));
     return result!;
   }
 
@@ -62,8 +62,13 @@ export class MemberService {
   // Explicit allowlist also protects direct service calls from role/statistic changes.
   private async profileChanges(input: MemberUpdate): Promise<Record<string, unknown>> {
     const changes: Record<string, unknown> = {};
-    for (const key of ['memberNick', 'memberPhone', 'memberFullName', 'memberImage', 'memberAddress', 'memberDesc'] as const) {
+    for (const key of ['memberNick', 'memberFullName', 'memberImage', 'memberAddress', 'memberDesc'] as const) {
       if (input[key] != null) changes[key] = input[key];
+    }
+    if (input.memberPhone != null) {
+      const phone = input.memberPhone.trim();
+      if (!phone) throw new BadRequestException(Message.BAD_REQUEST);
+      changes.memberPhone = phone;
     }
     if (input.memberEmail != null) changes.memberEmail = input.memberEmail.trim().toLowerCase();
     if (input.memberPassword != null) {
@@ -80,14 +85,14 @@ export class MemberService {
       .exec();
     
     if (!response || response.memberStatus === MemberStatus.DELETE) {
-      throw new InternalServerErrorException(Message.NO_MEMBER_NICK);
+      throw new UnauthorizedException(Message.NOT_AUTHENTICATED);
     } else if (response.memberStatus === MemberStatus.BLOCK) {
-      throw new InternalServerErrorException(Message.BLOCKED_USER);
+      throw new ForbiddenException(Message.BLOCKED_USER);
     } 
 
     const isMatch = await this.authService.comparePasswords(input.memberPassword, response.memberPassword);
-    if (!isMatch) throw new InternalServerErrorException(Message.WRONG_PASSWORD);
-    response.accessToken = await this.authService.createToken(response);
+    if (!isMatch) throw new UnauthorizedException(Message.NOT_AUTHENTICATED);
+    Object.assign(response, await this.authService.createSession(response));
     
     return response;
   }
@@ -107,8 +112,23 @@ export class MemberService {
 
     if (!result) throw new InternalServerErrorException(Message.UPDATE_FAILED);
 
-    result.accessToken = await this.authService.createToken(result);
     return result;
+  }
+
+  public async getHotelOwner(ownerId: Types.ObjectId): Promise<MemberPublic | null> {
+    const owner = await this.memberModel.findOne({
+      _id: ownerId,
+      memberStatus: MemberStatus.ACTIVE,
+      memberType: MemberType.HOTEL_OWNER,
+    }).select('_id memberNick memberImage memberDesc').lean().exec();
+
+    if (!owner) return null;
+    return {
+      _id: new Types.ObjectId(owner._id.toString()),
+      memberNick: owner.memberNick,
+      memberImage: owner.memberImage,
+      memberDesc: owner.memberDesc,
+    };
   }
 
   public async getMember(memberId: ObjectId, targetId: ObjectId): Promise<Member> {
@@ -145,12 +165,12 @@ export class MemberService {
     return result ? [{ followerId: followerId, followingId: followingId, myFollowing: true }] : [];
   }
 
-  public async getAgents(memberId: ObjectId, input: AgentsInquiry): Promise<Members> {
+  public async getHotelOwners(memberId: ObjectId, input: HotelOwnersInquiry): Promise<Members> {
 		const { text } = input.search;
 		const match: T = { memberType: MemberType.HOTEL_OWNER, memberStatus: MemberStatus.ACTIVE };
-		const sort: T = { [input?.sort ?? 'createdAt']: input?.direction ?? Direction.DESC };
+		const sort: T = { [input?.sort ?? 'createdAt']: input?.direction ?? Direction.DESC, _id: input?.direction ?? Direction.DESC };
 
-		if (text) match.memberNick = { $regex: new RegExp(text, 'i') };
+        if (text) match.memberNick = { $regex: escapeSearchText(text), $options: 'i' };
 		console.log('match:', match);
 
 		const result = await this.memberModel
@@ -163,6 +183,7 @@ export class MemberService {
               { $skip: (input.page - 1) * input.limit },
               { $limit: input.limit },
               lookupAuthMemberLiked(memberId),
+              ...(memberId ? [lookupAuthMemberFollowed({ followerId: memberId, followingId: '$_id' })] : []),
             ],
 						metaCounter: [{ $count: 'total' }],
 					},
@@ -199,7 +220,7 @@ export class MemberService {
 
 		if (memberStatus) match.memberStatus = memberStatus;
 		if (memberType) match.memberType = memberType;
-		if (text) match.memberNick = { $regex: new RegExp(text, 'i') };
+        if (text) match.memberNick = { $regex: escapeSearchText(text), $options: 'i' };
 
 		console.log('match:', match);
 
@@ -239,11 +260,14 @@ export class MemberService {
     return result;
   }
   
-  public async memberStatsEditor(input: StatisticModifier): Promise<Member>{
-    console.log('executed');
+  public async memberStatsEditor(input: StatisticModifier, session?: ClientSession, allowInactiveOwner = false): Promise<Member>{
     const { _id, targetKey, modifier } = input;
     const result = await this.memberModel
-      .findByIdAndUpdate(_id, { $inc: { [targetKey]: modifier } }, { new: true })
+      .findOneAndUpdate(
+        { _id, ...(targetKey === 'memberHotels' ? { ...(!allowInactiveOwner || modifier >= 0 ? { memberStatus: MemberStatus.ACTIVE } : {}), memberType: MemberType.HOTEL_OWNER } : {}) },
+        { $inc: { [targetKey]: modifier } },
+        { new: true, session },
+      )
       .exec();
 
     if (!result) throw new InternalServerErrorException(Message.UPDATE_FAILED);

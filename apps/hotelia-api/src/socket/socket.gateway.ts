@@ -1,28 +1,97 @@
 import { Logger } from '@nestjs/common';
-import { OnGatewayInit, SubscribeMessage, WebSocketGateway } from '@nestjs/websockets';
+import { OnGatewayInit, SubscribeMessage, WebSocketGateway, WebSocketServer } from '@nestjs/websockets';
 import { Server } from 'ws';
+import { randomUUID } from 'crypto';
+import * as WebSocket from 'ws';
 
-@WebSocketGateway({ transports: ['websocket'], secure: false })
+interface MessagePayload {
+	event: string;
+	text: string;
+	id: string;
+	clientId: string;
+	createdAt: string;
+}
+
+interface InfoPayload {
+	event: string;
+	totalClients: number;
+}
+
+@WebSocketGateway({ maxPayload: 16 * 1024 })
 export class SocketGateway implements OnGatewayInit {
-  private logger: Logger = new Logger('SocketEventsGateway');
-  private summaryClient: number = 0;
+	private logger: Logger = new Logger('SocketEventsGateway');
+	private readonly clients = new Map<WebSocket, string>();
+	private readonly messageList: MessagePayload[] = [];
+	private readonly lastMessageAt = new WeakMap<WebSocket, number>();
 
-  public afterInit(server: Server) {
-    this.logger.log(`WebSocket Server Initialized total: ${this.summaryClient}`);
-  }
+	@WebSocketServer()
+	server: Server | undefined;
 
-  handleConnection(client: WebSocket, ...args: any[]) {
-    this.summaryClient++;
-    this.logger.log(`== Client connected total: ${this.summaryClient} ==`);
-  }
+	public afterInit(server: Server) {
+		this.server = server;
+		this.logger.verbose(`WebSocket Server Initialized`);
+	}
 
-  handleDisconnect(client: WebSocket) {
-    this.summaryClient--;
-    this.logger.log(`== Client disconnected left total: ${this.summaryClient} ==`);
-  }
+	handleConnection(client: WebSocket) {
+		if (client.readyState !== WebSocket.OPEN || this.clients.has(client)) return;
+		const clientId = randomUUID();
+		this.clients.set(client, clientId);
+		// Public chat identity is connection-scoped; no JWT or member details are exposed.
+		client.send(JSON.stringify({ event: 'getMessages', clientId, list: this.messageList }));
+		this.emitMessage({ event: 'info', totalClients: this.clients.size });
+	}
 
-  @SubscribeMessage('message')
-  public handleMessage(client: WebSocket, payload: any): string {
-    return 'Hello world!';
-  }
+	handleDisconnect(client: WebSocket) {
+		this.lastMessageAt.delete(client);
+		if (!this.clients.delete(client)) return;
+		this.broadcastMessage(client, { event: 'info', totalClients: this.clients.size });
+	}
+
+	@SubscribeMessage('message')
+	public async handleMessage(client: WebSocket, payload: unknown): Promise<void> {
+		if (client.readyState !== WebSocket.OPEN || !this.clients.has(client)) return;
+		if (typeof payload !== 'string' || payload.length > 1000 || !payload.trim()) {
+			this.sendError(client, 'INVALID_MESSAGE', 'Send a non-empty message of at most 1000 characters');
+			return;
+		}
+		const now = Date.now();
+		const previous = this.lastMessageAt.get(client);
+		if (previous !== undefined && now - previous < 2000) {
+			this.sendError(client, 'RATE_LIMITED', 'Please wait before sending another message', 2000 - (now - previous));
+			return;
+		}
+		this.lastMessageAt.set(client, now);
+		const message: MessagePayload = {
+			event: 'message',
+			id: randomUUID(),
+			clientId: this.clients.get(client)!,
+			text: payload.trim(),
+			createdAt: new Date(now).toISOString(),
+		};
+		this.messageList.push(message);
+		if (this.messageList.length > 5) this.messageList.shift();
+		this.emitMessage(message);
+	}
+
+	private sendError(client: WebSocket, code: string, message: string, retryAfterMs?: number): void {
+		client.send(
+			JSON.stringify({ event: 'error', code, message, ...(retryAfterMs !== undefined ? { retryAfterMs } : {}) }),
+		);
+	}
+
+	private broadcastMessage(sender: WebSocket, message: InfoPayload | MessagePayload) {
+		this.server?.clients.forEach((client) => {
+			if (client !== sender && client.readyState === WebSocket.OPEN) {
+				client.send(JSON.stringify(message));
+			}
+		});
+	}
+
+	private emitMessage(message: InfoPayload | MessagePayload) {
+		this.server?.clients.forEach((client) => {
+			if (client.readyState === WebSocket.OPEN) {
+				client.send(JSON.stringify(message));
+			}
+		});
+	}
 }

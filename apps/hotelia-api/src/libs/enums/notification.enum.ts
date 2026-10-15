@@ -8,6 +8,9 @@ export enum NotificationType {
 	BOOKING_CONFIRMED = 'BOOKING_CONFIRMED',
 	BOOKING_CANCELLED = 'BOOKING_CANCELLED',
 	BOOKING_COMPLETED = 'BOOKING_COMPLETED',
+	HOTEL_CREATED = 'HOTEL_CREATED',
+	ROOM_CREATED = 'ROOM_CREATED',
+	SUPPORT_MESSAGE = 'SUPPORT_MESSAGE',
 	REVIEW = 'REVIEW',
 }
 registerEnumType(NotificationType, {
@@ -25,9 +28,10 @@ registerEnumType(NotificationStatus, {
 export enum NotificationGroup {
 	MEMBER = 'MEMBER',
 	ARTICLE = 'ARTICLE',
-	PROPERTY = 'PROPERTY', // Legacy: remove with Property migration.
 	HOTEL = 'HOTEL',
 	BOOKING = 'BOOKING',
+	ROOM = 'ROOM',
+	SUPPORT = 'SUPPORT',
 }
 registerEnumType(NotificationGroup, {
 	name: 'NotificationGroup',

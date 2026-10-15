@@ -1,7 +1,8 @@
+import { Type } from 'class-transformer';
 import { Field, InputType, Int } from "@nestjs/graphql";
-import { IsEmail, IsIn, IsNotEmpty, IsOptional, Length, Min } from "class-validator";
+import { IsEmail, IsEnum, IsInt, Max, IsObject, ValidateNested, IsIn, IsNotEmpty, IsOptional, Length, Min } from "class-validator";
 import { MemberStatus, MemberType } from "../../enums/member.enum";
-import { availableAgentSorts, availableMemberSorts } from "../../config";
+import { availableHotelOwnerSorts, availableMemberSorts } from "../../config";
 import { Direction } from "../../enums/common.enum";
 
 
@@ -47,45 +48,55 @@ export class LoginInput {
 }
 
 @InputType()
-class AISearch {
+class OwnerSearch {
 	@IsOptional()
 	@Field(() => String, { nullable: true })
 	text?: string;
 }
 
 @InputType()
-export class AgentsInquiry {
+export class HotelOwnersInquiry {
 	@IsNotEmpty()
 	@Min(1)
+	@Max(1000000)
+	@IsInt()
 	@Field(() => Int)
 	page!: number;
 
 	@IsNotEmpty()
 	@Min(1)
+	@Max(100)
+	@IsInt()
 	@Field(() => Int)
 	limit!: number;
 
 	@IsOptional()
-	@IsIn(availableAgentSorts)
+	@IsIn(availableHotelOwnerSorts)
 	@Field(() => String, { nullable: true })
 	sort?: string;
 
 	@IsOptional()
+	@IsEnum(Direction)
 	@Field(() => Direction, { nullable: true })
 	direction?: Direction;
 
 	@IsNotEmpty()
-	@Field(() => AISearch)
-	search!: AISearch;
+	@IsObject()
+	@ValidateNested()
+	@Type(() => OwnerSearch)
+	@Field(() => OwnerSearch)
+	search!: OwnerSearch;
 }
 
 @InputType()
 class MISearch {
 	@IsOptional()
+	@IsEnum(MemberStatus)
 	@Field(() => MemberStatus, { nullable: true })
 	memberStatus?: MemberStatus;
 
 	@IsOptional()
+	@IsEnum(MemberType)
 	@Field(() => MemberType, { nullable: true })
 	memberType?: MemberType;
 
@@ -98,11 +109,15 @@ class MISearch {
 export class MembersInquiry {
 	@IsNotEmpty()
 	@Min(1)
+	@Max(1000000)
+	@IsInt()
 	@Field(() => Int)
 	page!: number;
 
 	@IsNotEmpty()
 	@Min(1)
+	@Max(100)
+	@IsInt()
 	@Field(() => Int)
 	limit!: number;
 
@@ -112,10 +127,14 @@ export class MembersInquiry {
 	sort?: string;
 
 	@IsOptional()
+	@IsEnum(Direction)
 	@Field(() => Direction, { nullable: true })
 	direction?: Direction;
 
 	@IsNotEmpty()
+	@IsObject()
+	@ValidateNested()
+	@Type(() => MISearch)
 	@Field(() => MISearch)
 	search!: MISearch;
 }

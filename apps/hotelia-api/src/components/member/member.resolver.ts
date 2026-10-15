@@ -1,7 +1,7 @@
 import { Args, Mutation, Query, Resolver } from '@nestjs/graphql';
 import { MemberService } from './member.service';
 import { InternalServerErrorException, UseGuards, UsePipes, ValidationPipe } from '@nestjs/common';
-import { AgentsInquiry, LoginInput, MemberInput, MembersInquiry } from '../../libs/dto/member/member.input';
+import { HotelOwnersInquiry, LoginInput, MemberInput, MembersInquiry } from '../../libs/dto/member/member.input';
 import { Member, Members } from '../../libs/dto/member/member';
 import { AuthGuard } from '../auth/guards/auth.guard';
 import { AuthMember } from '../auth/decorators/authMember.decorator';
@@ -12,8 +12,9 @@ import { RolesGuard } from '../auth/guards/roles.guard';
 import { AdminMemberUpdate, MemberUpdate } from '../../libs/dto/member/member.update';
 import { getSerialForImage, shapeIntoMongoObjectId, validMimeTypes } from '../../libs/config';
 import { WithoutGuard } from '../auth/guards/without.guard';
-import { GraphQLUpload, FileUpload } from 'graphql-upload';
-import { createWriteStream } from 'fs';
+import { GraphQLUpload } from 'graphql-upload-ts';
+import type { FileUpload } from 'graphql-upload-ts';
+import { saveImage, saveImages } from '../../libs/upload';
 import { Message } from '../../libs/enums/common.enum';
 
 @Resolver()
@@ -68,9 +69,9 @@ export class MemberResolver {
 
   @UseGuards(WithoutGuard)
 	@Query(() => Members)
-	async getAgents(@Args('input') input: AgentsInquiry, @AuthMember('_id') memberId: ObjectId): Promise<Members> {
-		console.log('Query: getAgents');
-		return await this.memberService.getAgents(memberId, input);
+	async getHotelOwners(@Args('input') input: HotelOwnersInquiry, @AuthMember('_id') memberId: ObjectId): Promise<Members> {
+		console.log('Query: getHotelOwners');
+		return await this.memberService.getHotelOwners(memberId, input);
   }
   
   @UseGuards(AuthGuard)
@@ -109,28 +110,11 @@ export class MemberResolver {
   @Mutation((returns) => String)
   public async imageUploader(
     @Args({ name: 'file', type: () => GraphQLUpload })
-  { createReadStream, filename, mimetype }: FileUpload,
+  // Upload promises are handled by GraphQLUpload, not DTO validation.
+  file: Promise<FileUpload> | FileUpload,
   @Args('target') target: String,
   ): Promise<string> {
-    console.log('Mutation: imageUploader');
-
-    if (!filename) throw new Error(Message.UPLOAD_FAILED);
-  const validMime = validMimeTypes.includes(mimetype);
-  if (!validMime) throw new Error(Message.PROVIDE_ALLOWED_FORMAT);
-
-  const imageName = getSerialForImage(filename);
-  const url = `uploads/${target}/${imageName}`;
-  const stream = createReadStream();
-
-  const result = await new Promise((resolve, reject) => {
-    stream
-      .pipe(createWriteStream(url))
-      .on('finish', async () => resolve(true))
-      .on('error', () => reject(false));
-  });
-  if (!result) throw new Error(Message.UPLOAD_FAILED);
-
-  return url;
+    return await saveImage(await file, String(target));
   }
 
   @UseGuards(AuthGuard)
@@ -140,35 +124,6 @@ export class MemberResolver {
   files: Promise<FileUpload>[],
   @Args('target') target: String,
   ): Promise<string[]> {
-    console.log('Mutation: imagesUploader');
-
-    const uploadedImages: string[] = [];
-    const promisedList = files.map(async (img: Promise<FileUpload>, index: number): Promise<void> => {
-      try {
-        const { filename, mimetype, encoding, createReadStream } = await img;
-
-        const validMime = validMimeTypes.includes(mimetype);
-        if (!validMime) throw new Error(Message.PROVIDE_ALLOWED_FORMAT);
-
-        const imageName = getSerialForImage(filename);
-        const url = `uploads/${target}/${imageName}`;
-        const stream = createReadStream();
-
-        const result = await new Promise((resolve, reject) => {
-          stream
-            .pipe(createWriteStream(url))
-            .on('finish', () => resolve(true))
-            .on('error', () => reject(false));
-        });
-        if (!result) throw new Error(Message.UPLOAD_FAILED);
-
-        uploadedImages[index] = url;
-      } catch (err) {
-        console.log('Error, file missing!');
-      }
-    });
-
-    await Promise.all(promisedList);
-    return uploadedImages;
+    return await saveImages(files, String(target));
   }
 }

@@ -1,0 +1,181 @@
+import { UseGuards, ValidationPipe } from '@nestjs/common';
+import { Args, Mutation, Query, Resolver } from '@nestjs/graphql';
+import { Hotel, Hotels, HotelLocation } from '../../libs/dto/hotel/hotel';
+import { AllHotelsInquiry, HotelsInquiry, OwnerHotelsInquiry } from '../../libs/dto/hotel/hotel.inquiry';
+import { HotelInput } from '../../libs/dto/hotel/hotel.input';
+import { AdminHotelUpdate, HotelUpdate } from '../../libs/dto/hotel/hotel.update';
+import { shapeIntoMongoObjectId } from '../../libs/config';
+import { Types } from 'mongoose';
+import { MemberType } from '../../libs/enums/member.enum';
+import { AuthMember } from '../auth/decorators/authMember.decorator';
+import { Roles } from '../auth/decorators/roles.decorator';
+import { WithoutGuard } from '../auth/guards/without.guard';
+import { RolesGuard } from '../auth/guards/roles.guard';
+import { HotelService } from './hotel.service';
+import { LikeService } from '../like/like.service';
+import { AuthGuard } from '../auth/guards/auth.guard';
+import { FavoriteResult } from '../../libs/dto/like/favorite-result';
+import { FavoritesInquiry } from '../../libs/dto/like/favorites.inquiry';
+import { ViewService } from '../view/view.service';
+import { VisitedInquiry } from '../../libs/dto/view/visited.inquiry';
+
+@Resolver(() => Hotel)
+export class HotelResolver {
+	constructor(
+		private readonly hotelService: HotelService,
+		private readonly likeService: LikeService,
+		private readonly viewService: ViewService,
+	) {}
+
+	@Query(() => [HotelLocation])
+	public async getHotelLocations(): Promise<HotelLocation[]> {
+		return this.hotelService.getHotelLocations();
+	}
+
+	@Roles(MemberType.ADMIN)
+	@UseGuards(RolesGuard)
+	@Query(() => Hotels)
+	public async getAllHotelsByAdmin(
+		@Args('input', new ValidationPipe({ transform: true, whitelist: true, forbidNonWhitelisted: true }))
+		input: AllHotelsInquiry,
+	): Promise<Hotels> {
+		return await this.hotelService.getAllHotelsByAdmin(input);
+	}
+
+	@Roles(MemberType.ADMIN)
+	@UseGuards(RolesGuard)
+	@Query(() => Hotel)
+	public async getHotelByAdmin(@Args('hotelId') input: string): Promise<Hotel> {
+		return await this.hotelService.getHotelByAdmin(shapeIntoMongoObjectId(input));
+	}
+
+	@Roles(MemberType.ADMIN)
+	@UseGuards(RolesGuard)
+	@Mutation(() => Hotel)
+	public async updateHotelByAdmin(
+		@Args('input', new ValidationPipe({ transform: true, whitelist: true, forbidNonWhitelisted: true }))
+		input: AdminHotelUpdate,
+	): Promise<Hotel> {
+		return await this.hotelService.updateHotelByAdmin(input);
+	}
+
+	@UseGuards(AuthGuard)
+	@Mutation(() => FavoriteResult)
+	public async favoriteHotel(
+		@AuthMember('_id') memberId: Types.ObjectId,
+		@Args('hotelId') input: string,
+	): Promise<FavoriteResult> {
+		return await this.likeService.setHotelFavorite(memberId, shapeIntoMongoObjectId(input), true);
+	}
+
+	@UseGuards(AuthGuard)
+	@Mutation(() => FavoriteResult)
+	public async unfavoriteHotel(
+		@AuthMember('_id') memberId: Types.ObjectId,
+		@Args('hotelId') input: string,
+	): Promise<FavoriteResult> {
+		return await this.likeService.setHotelFavorite(memberId, shapeIntoMongoObjectId(input), false);
+	}
+
+	@UseGuards(AuthGuard)
+	@Query(() => Hotels)
+	public async getFavorites(
+		@AuthMember('_id') memberId: Types.ObjectId,
+		@Args('input', new ValidationPipe({ transform: true, whitelist: true, forbidNonWhitelisted: true }))
+		input: FavoritesInquiry,
+	): Promise<Hotels> {
+		return await this.likeService.getFavoriteHotels(memberId, input);
+	}
+
+	@UseGuards(AuthGuard)
+	@Query(() => Hotels)
+	public async getVisited(
+		@AuthMember('_id') memberId: Types.ObjectId,
+		@Args('input', new ValidationPipe({ transform: true, whitelist: true, forbidNonWhitelisted: true }))
+		input: VisitedInquiry,
+	): Promise<Hotels> {
+		const result = await this.viewService.getVisitedHotels(memberId, input);
+		await this.likeService.attachFavoriteStatus(result.list, memberId);
+		return result;
+	}
+
+	@Roles(MemberType.HOTEL_OWNER)
+	@UseGuards(RolesGuard)
+	@Mutation(() => Hotel)
+	public async createHotel(
+		@AuthMember('_id') memberId: Types.ObjectId,
+		@Args('input', new ValidationPipe({ transform: true, whitelist: true, forbidNonWhitelisted: true }))
+		input: HotelInput,
+	): Promise<Hotel> {
+		input.ownerId = memberId;
+		return await this.hotelService.createHotel(input);
+	}
+
+	@Roles(MemberType.HOTEL_OWNER)
+	@UseGuards(RolesGuard)
+	@Mutation(() => Hotel)
+	public async updateHotel(
+		@AuthMember('_id') memberId: Types.ObjectId,
+		@Args('input', new ValidationPipe({ transform: true, whitelist: true, forbidNonWhitelisted: true }))
+		input: HotelUpdate,
+	): Promise<Hotel> {
+		return await this.hotelService.updateHotel(memberId, input);
+	}
+
+	@Roles(MemberType.HOTEL_OWNER)
+	@UseGuards(RolesGuard)
+	@Mutation(() => Hotel)
+	public async deleteHotel(
+		@AuthMember('_id') memberId: Types.ObjectId,
+		@Args('hotelId') input: string,
+	): Promise<Hotel> {
+		const hotelId = shapeIntoMongoObjectId(input);
+		return await this.hotelService.deleteHotel(memberId, hotelId);
+	}
+
+	@UseGuards(WithoutGuard)
+	@Query(() => Hotels)
+	public async getHotels(
+		@Args('input', new ValidationPipe({ transform: true, whitelist: true, forbidNonWhitelisted: true }))
+		input: HotelsInquiry,
+		@AuthMember('_id') memberId: Types.ObjectId | null,
+	): Promise<Hotels> {
+		const result = await this.hotelService.getHotels(input);
+		await this.likeService.attachFavoriteStatus(result.list, memberId);
+		return result;
+	}
+
+	@Roles(MemberType.HOTEL_OWNER)
+	@UseGuards(RolesGuard)
+	@Query(() => Hotels)
+	public async getOwnerHotels(
+		@AuthMember('_id') memberId: Types.ObjectId,
+		@Args('input', new ValidationPipe({ transform: true, whitelist: true, forbidNonWhitelisted: true }))
+		input: OwnerHotelsInquiry,
+	): Promise<Hotels> {
+		return await this.hotelService.getOwnerHotels(memberId, input);
+	}
+
+	@Roles(MemberType.HOTEL_OWNER)
+	@UseGuards(RolesGuard)
+	@Query(() => Hotel)
+	public async getOwnerHotel(
+		@AuthMember('_id') memberId: Types.ObjectId,
+		@Args('hotelId') input: string,
+	): Promise<Hotel> {
+		const hotelId = shapeIntoMongoObjectId(input);
+		return await this.hotelService.getOwnerHotel(memberId, hotelId);
+	}
+
+	@UseGuards(WithoutGuard)
+	@Query(() => Hotel)
+	public async getHotel(
+		@Args('hotelId') input: string,
+		@AuthMember('_id') memberId: Types.ObjectId | null,
+	): Promise<Hotel> {
+		const hotelId = shapeIntoMongoObjectId(input);
+		const hotel = await this.hotelService.getHotel(hotelId, memberId);
+		await this.likeService.attachFavoriteStatus([hotel], memberId);
+		return hotel;
+	}
+}

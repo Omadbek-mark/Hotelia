@@ -1,6 +1,12 @@
+import { ChatbotModule } from './chatbot/chatbot.module';
+import { SupportModule } from './support/support.module';
+import { BoConfigModule } from './bo-config/bo-config.module';
 import { Module } from '@nestjs/common';
+import { PaymentModule } from './payment/payment.module';
+import { HotelModule } from './hotel/hotel.module';
+import { RoomModule } from './room/room.module';
+import { BookingModule } from './booking/booking.module';
 import { MemberModule } from './member/member.module';
-import { PropertyModule } from './property/property.module';
 import { AuthModule } from './auth/auth.module';
 import { ViewModule } from './view/view.module';
 import { FollowModule } from './follow/follow.module';
@@ -9,15 +15,21 @@ import { LikeModule } from './like/like.module';
 import { CommentModule } from './comment/comment.module';
 
 @Module({
-  imports: [
-   MemberModule,
-   AuthModule,
-   PropertyModule,
-   BoardArticleModule,
-   LikeModule,
-   ViewModule,
-   CommentModule,
-   FollowModule,
-  ],
+	imports: [
+		PaymentModule,
+		ChatbotModule,
+		BoConfigModule,
+		SupportModule,
+		HotelModule,
+		RoomModule,
+		BookingModule,
+		MemberModule,
+		AuthModule,
+		BoardArticleModule,
+		LikeModule,
+		ViewModule,
+		CommentModule,
+		FollowModule,
+	],
 })
 export class ComponentsModule {}

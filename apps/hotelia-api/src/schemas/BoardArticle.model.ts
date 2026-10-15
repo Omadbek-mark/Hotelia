@@ -18,11 +18,17 @@ const BoardArticleSchema = new Schema(
 		articleTitle: {
 			type: String,
 			required: true,
+			trim: true,
+			minlength: 3,
+			maxlength: 50,
 		},
 
 		articleContent: {
 			type: String,
 			required: true,
+			trim: true,
+			minlength: 3,
+			maxlength: 250,
 		},
 
 		articleImage: {
@@ -48,6 +54,7 @@ const BoardArticleSchema = new Schema(
 			type: Schema.Types.ObjectId,
 			required: true,
 			ref: 'Member',
+			immutable: true,
 		},
 	},
 	{ timestamps: true, collection: 'boardArticles' },

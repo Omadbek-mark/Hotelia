@@ -1,0 +1,349 @@
+{
+  "images": {
+    "hotel/budget": {
+      "path": "uploads/hotel/b2c80e55-b593-40dc-a304-9977548d6cc0.jpg",
+      "source": "https://images.unsplash.com/photo-1582719478250-c89cae4dc85b",
+      "license": "https://unsplash.com/license"
+    },
+    "hotel/room-budget": {
+      "path": "uploads/hotel/07193035-e227-42f7-8068-68f5b015e0fc.jpg",
+      "source": "https://images.unsplash.com/photo-1566665797739-1674de7a421a",
+      "license": "https://unsplash.com/license"
+    },
+    "hotel/room-standard": {
+      "path": "uploads/hotel/6fae832f-4b19-47c0-a1cf-65ee75cafe2e.jpg",
+      "source": "https://images.unsplash.com/photo-1590490360182-c33d57733427",
+      "license": "https://unsplash.com/license"
+    },
+    "hotel/room-simple": {
+      "path": "uploads/hotel/cc862a71-0ee4-4b76-a3bd-1f86709ac7cc.jpg",
+      "source": "https://images.unsplash.com/photo-1578683010236-d716f9a3f461",
+      "license": "https://unsplash.com/license"
+    },
+    "hotel/lounge": {
+      "path": "uploads/hotel/2f982c07-a386-4c7e-8c80-6cc885907e24.jpg",
+      "source": "https://images.unsplash.com/photo-1600210492486-724fe5c67fb0",
+      "license": "https://unsplash.com/license"
+    },
+    "hotel/suite": {
+      "path": "uploads/hotel/eba90904-6805-492f-b3a3-304f98e31a0b.jpg",
+      "source": "https://images.unsplash.com/photo-1560448204-e02f11c3d0e2",
+      "license": "https://unsplash.com/license"
+    },
+    "room/budget": {
+      "path": "uploads/room/26cdfb3f-48af-4e86-8e6d-8f39bf1e221a.jpg",
+      "source": "https://images.unsplash.com/photo-1582719478250-c89cae4dc85b",
+      "license": "https://unsplash.com/license"
+    },
+    "room/room-budget": {
+      "path": "uploads/room/fdafe72c-b292-4bf8-aeff-1f8487259c7b.jpg",
+      "source": "https://images.unsplash.com/photo-1566665797739-1674de7a421a",
+      "license": "https://unsplash.com/license"
+    },
+    "room/room-standard": {
+      "path": "uploads/room/d1742448-fd7f-4cbb-9a98-3b37a788d28a.jpg",
+      "source": "https://images.unsplash.com/photo-1590490360182-c33d57733427",
+      "license": "https://unsplash.com/license"
+    },
+    "room/room-simple": {
+      "path": "uploads/room/47213515-2940-4ee2-870b-96e6b378e47f.jpg",
+      "source": "https://images.unsplash.com/photo-1578683010236-d716f9a3f461",
+      "license": "https://unsplash.com/license"
+    }
+  },
+  "hotels": [
+    {
+      "hotelId": "6acb4f1bb74f04a54db538d7",
+      "ownerId": "6acb4490b74f04a54db53524",
+      "ownerNick": "Bobur",
+      "hotelName": "Tashkent Sapphire Palace",
+      "country": "Uzbekistan",
+      "city": "Tashkent",
+      "type": "HOTEL",
+      "pricePerNightUSD": 180,
+      "hotelImages": [
+        "uploads/hotel/6fae832f-4b19-47c0-a1cf-65ee75cafe2e.jpg",
+        "uploads/hotel/eba90904-6805-492f-b3a3-304f98e31a0b.jpg",
+        "uploads/hotel/2f982c07-a386-4c7e-8c80-6cc885907e24.jpg"
+      ],
+      "roomId": "6acb4f1bb74f04a54db538e1",
+      "roomQuantity": 8,
+      "verified": true
+    },
+    {
+      "hotelId": "6acb4f1cb74f04a54db538ec",
+      "ownerId": "6acb4490b74f04a54db53535",
+      "ownerNick": "Aziz",
+      "hotelName": "Tashkent Metro Inn",
+      "country": "Uzbekistan",
+      "city": "Tashkent",
+      "type": "HOTEL",
+      "pricePerNightUSD": 28,
+      "hotelImages": [
+        "uploads/hotel/b2c80e55-b593-40dc-a304-9977548d6cc0.jpg",
+        "uploads/hotel/2f982c07-a386-4c7e-8c80-6cc885907e24.jpg"
+      ],
+      "roomId": "6acb4f1cb74f04a54db538f6",
+      "roomQuantity": 12,
+      "verified": true
+    },
+    {
+      "hotelId": "6acb4f1cb74f04a54db53901",
+      "ownerId": "6acb4490b74f04a54db53535",
+      "ownerNick": "Aziz",
+      "hotelName": "Andijan Silk Garden",
+      "country": "Uzbekistan",
+      "city": "Andijan",
+      "type": "HOTEL",
+      "pricePerNightUSD": 65,
+      "hotelImages": [
+        "uploads/hotel/07193035-e227-42f7-8068-68f5b015e0fc.jpg",
+        "uploads/hotel/2f982c07-a386-4c7e-8c80-6cc885907e24.jpg",
+        "uploads/hotel/eba90904-6805-492f-b3a3-304f98e31a0b.jpg"
+      ],
+      "roomId": "6acb4f1cb74f04a54db5390b",
+      "roomQuantity": 8,
+      "verified": true
+    },
+    {
+      "hotelId": "6acb4f1cb74f04a54db53916",
+      "ownerId": "6acb4490b74f04a54db53524",
+      "ownerNick": "Bobur",
+      "hotelName": "Samarkand Registan Courtyard",
+      "country": "Uzbekistan",
+      "city": "Samarkand",
+      "type": "HOTEL",
+      "pricePerNightUSD": 85,
+      "hotelImages": [
+        "uploads/hotel/07193035-e227-42f7-8068-68f5b015e0fc.jpg",
+        "uploads/hotel/2f982c07-a386-4c7e-8c80-6cc885907e24.jpg",
+        "uploads/hotel/eba90904-6805-492f-b3a3-304f98e31a0b.jpg"
+      ],
+      "roomId": "6acb4f1db74f04a54db53920",
+      "roomQuantity": 8,
+      "verified": true
+    },
+    {
+      "hotelId": "6acb4f1db74f04a54db5392b",
+      "ownerId": "6acb4490b74f04a54db53535",
+      "ownerNick": "Aziz",
+      "hotelName": "Khorezm Oasis Hotel",
+      "country": "Uzbekistan",
+      "city": "Khiva",
+      "type": "HOTEL",
+      "pricePerNightUSD": 70,
+      "hotelImages": [
+        "uploads/hotel/07193035-e227-42f7-8068-68f5b015e0fc.jpg",
+        "uploads/hotel/2f982c07-a386-4c7e-8c80-6cc885907e24.jpg",
+        "uploads/hotel/eba90904-6805-492f-b3a3-304f98e31a0b.jpg"
+      ],
+      "roomId": "6acb4f1db74f04a54db53935",
+      "roomQuantity": 8,
+      "verified": true
+    },
+    {
+      "hotelId": "6acb4f1db74f04a54db53940",
+      "ownerId": "6acb4492b74f04a54db53579",
+      "ownerNick": "Alikhan",
+      "hotelName": "Astana Steppe Grand",
+      "country": "Kazakhstan",
+      "city": "Astana",
+      "type": "HOTEL",
+      "pricePerNightUSD": 210,
+      "hotelImages": [
+        "uploads/hotel/6fae832f-4b19-47c0-a1cf-65ee75cafe2e.jpg",
+        "uploads/hotel/eba90904-6805-492f-b3a3-304f98e31a0b.jpg",
+        "uploads/hotel/2f982c07-a386-4c7e-8c80-6cc885907e24.jpg"
+      ],
+      "roomId": "6acb4f1eb74f04a54db5394a",
+      "roomQuantity": 8,
+      "verified": true
+    },
+    {
+      "hotelId": "6acb4f1eb74f04a54db53955",
+      "ownerId": "6acb4492b74f04a54db5358a",
+      "ownerNick": "Nurlan",
+      "hotelName": "Astana Nomad Inn",
+      "country": "Kazakhstan",
+      "city": "Astana",
+      "type": "HOTEL",
+      "pricePerNightUSD": 35,
+      "hotelImages": [
+        "uploads/hotel/b2c80e55-b593-40dc-a304-9977548d6cc0.jpg",
+        "uploads/hotel/2f982c07-a386-4c7e-8c80-6cc885907e24.jpg"
+      ],
+      "roomId": "6acb4f1eb74f04a54db5395f",
+      "roomQuantity": 12,
+      "verified": true
+    },
+    {
+      "hotelId": "6acb4f1eb74f04a54db5396a",
+      "ownerId": "6acb4492b74f04a54db5358a",
+      "ownerNick": "Nurlan",
+      "hotelName": "Almaty Mountain Garden",
+      "country": "Kazakhstan",
+      "city": "Almaty",
+      "type": "HOTEL",
+      "pricePerNightUSD": 95,
+      "hotelImages": [
+        "uploads/hotel/07193035-e227-42f7-8068-68f5b015e0fc.jpg",
+        "uploads/hotel/2f982c07-a386-4c7e-8c80-6cc885907e24.jpg",
+        "uploads/hotel/eba90904-6805-492f-b3a3-304f98e31a0b.jpg"
+      ],
+      "roomId": "6acb4f1fb74f04a54db53974",
+      "roomQuantity": 8,
+      "verified": true
+    },
+    {
+      "hotelId": "6acb4f1fb74f04a54db5397f",
+      "ownerId": "6acb4492b74f04a54db53579",
+      "ownerNick": "Alikhan",
+      "hotelName": "Turkistan Caravan Courtyard",
+      "country": "Kazakhstan",
+      "city": "Turkistan",
+      "type": "HOTEL",
+      "pricePerNightUSD": 75,
+      "hotelImages": [
+        "uploads/hotel/07193035-e227-42f7-8068-68f5b015e0fc.jpg",
+        "uploads/hotel/2f982c07-a386-4c7e-8c80-6cc885907e24.jpg",
+        "uploads/hotel/eba90904-6805-492f-b3a3-304f98e31a0b.jpg"
+      ],
+      "roomId": "6acb4f1fb74f04a54db53989",
+      "roomQuantity": 8,
+      "verified": true
+    },
+    {
+      "hotelId": "6acb4f1fb74f04a54db53994",
+      "ownerId": "6acb4492b74f04a54db5358a",
+      "ownerNick": "Nurlan",
+      "hotelName": "Burabay Pine Resort",
+      "country": "Kazakhstan",
+      "city": "Burabay",
+      "type": "RESORT",
+      "pricePerNightUSD": 90,
+      "hotelImages": [
+        "uploads/hotel/cc862a71-0ee4-4b76-a3bd-1f86709ac7cc.jpg",
+        "uploads/hotel/2f982c07-a386-4c7e-8c80-6cc885907e24.jpg",
+        "uploads/hotel/07193035-e227-42f7-8068-68f5b015e0fc.jpg"
+      ],
+      "roomId": "6acb4f20b74f04a54db5399e",
+      "roomQuantity": 8,
+      "verified": true
+    },
+    {
+      "hotelId": "6acb4f20b74f04a54db539a9",
+      "ownerId": "6acb4494b74f04a54db535ce",
+      "ownerNick": "Bakyt",
+      "hotelName": "Bishkek Ala-Too Grand",
+      "country": "Kyrgyzstan",
+      "city": "Bishkek",
+      "type": "HOTEL",
+      "pricePerNightUSD": 150,
+      "hotelImages": [
+        "uploads/hotel/6fae832f-4b19-47c0-a1cf-65ee75cafe2e.jpg",
+        "uploads/hotel/eba90904-6805-492f-b3a3-304f98e31a0b.jpg",
+        "uploads/hotel/2f982c07-a386-4c7e-8c80-6cc885907e24.jpg"
+      ],
+      "roomId": "6acb4f20b74f04a54db539b3",
+      "roomQuantity": 8,
+      "verified": true
+    },
+    {
+      "hotelId": "6acb4f20b74f04a54db539be",
+      "ownerId": "6acb4494b74f04a54db535df",
+      "ownerNick": "Nursultan",
+      "hotelName": "Bishkek City Inn",
+      "country": "Kyrgyzstan",
+      "city": "Bishkek",
+      "type": "HOTEL",
+      "pricePerNightUSD": 25,
+      "hotelImages": [
+        "uploads/hotel/b2c80e55-b593-40dc-a304-9977548d6cc0.jpg",
+        "uploads/hotel/2f982c07-a386-4c7e-8c80-6cc885907e24.jpg"
+      ],
+      "roomId": "6acb4f21b74f04a54db539c8",
+      "roomQuantity": 12,
+      "verified": true
+    },
+    {
+      "hotelId": "6acb4f21b74f04a54db539d3",
+      "ownerId": "6acb4494b74f04a54db535df",
+      "ownerNick": "Nursultan",
+      "hotelName": "Issyk-Kul Lake Retreat",
+      "country": "Kyrgyzstan",
+      "city": "Cholpon-Ata",
+      "type": "RESORT",
+      "pricePerNightUSD": 80,
+      "hotelImages": [
+        "uploads/hotel/cc862a71-0ee4-4b76-a3bd-1f86709ac7cc.jpg",
+        "uploads/hotel/2f982c07-a386-4c7e-8c80-6cc885907e24.jpg",
+        "uploads/hotel/07193035-e227-42f7-8068-68f5b015e0fc.jpg"
+      ],
+      "roomId": "6acb4f21b74f04a54db539dd",
+      "roomQuantity": 8,
+      "verified": true
+    },
+    {
+      "hotelId": "6acb4f21b74f04a54db539e8",
+      "ownerId": "6acb4494b74f04a54db535ce",
+      "ownerNick": "Bakyt",
+      "hotelName": "Osh Silk Road Hotel",
+      "country": "Kyrgyzstan",
+      "city": "Osh",
+      "type": "HOTEL",
+      "pricePerNightUSD": 55,
+      "hotelImages": [
+        "uploads/hotel/07193035-e227-42f7-8068-68f5b015e0fc.jpg",
+        "uploads/hotel/2f982c07-a386-4c7e-8c80-6cc885907e24.jpg",
+        "uploads/hotel/eba90904-6805-492f-b3a3-304f98e31a0b.jpg"
+      ],
+      "roomId": "6acb4f21b74f04a54db539f2",
+      "roomQuantity": 8,
+      "verified": true
+    },
+    {
+      "hotelId": "6acb4f22b74f04a54db539fd",
+      "ownerId": "6acb4494b74f04a54db535df",
+      "ownerNick": "Nursultan",
+      "hotelName": "Naryn Mountain Lodge",
+      "country": "Kyrgyzstan",
+      "city": "Naryn",
+      "type": "HOTEL",
+      "pricePerNightUSD": 60,
+      "hotelImages": [
+        "uploads/hotel/07193035-e227-42f7-8068-68f5b015e0fc.jpg",
+        "uploads/hotel/2f982c07-a386-4c7e-8c80-6cc885907e24.jpg",
+        "uploads/hotel/eba90904-6805-492f-b3a3-304f98e31a0b.jpg"
+      ],
+      "roomId": "6acb4f22b74f04a54db53a07",
+      "roomQuantity": 8,
+      "verified": true
+    }
+  ],
+  "verifiedOwners": [
+    {
+      "memberNick": "Bobur",
+      "memberHotels": 2
+    },
+    {
+      "memberNick": "Aziz",
+      "memberHotels": 3
+    },
+    {
+      "memberNick": "Alikhan",
+      "memberHotels": 2
+    },
+    {
+      "memberNick": "Nurlan",
+      "memberHotels": 3
+    },
+    {
+      "memberNick": "Bakyt",
+      "memberHotels": 2
+    },
+    {
+      "memberNick": "Nursultan",
+      "memberHotels": 3
+    }
+  ]
+}

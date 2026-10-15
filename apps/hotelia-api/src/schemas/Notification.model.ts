@@ -42,10 +42,14 @@ const NotificationSchema = new Schema(
 			ref: 'Member',
 		},
 
-		propertyId: {
+		hotelId: {
 			type: Schema.Types.ObjectId,
-			ref: 'Property',
+			ref: 'Hotel',
 		},
+
+		bookingId: { type: Schema.Types.ObjectId, ref: 'Booking' },
+		roomId: { type: Schema.Types.ObjectId, ref: 'Room' },
+		inquiryId: { type: Schema.Types.ObjectId, ref: 'Notice' },
 
 		articleId: {
 			type: Schema.Types.ObjectId,
@@ -53,6 +57,13 @@ const NotificationSchema = new Schema(
 		},
 	},
 	{ timestamps: true, collection: 'notifications' },
+);
+
+NotificationSchema.index({ receiverId: 1, createdAt: -1, _id: -1 });
+NotificationSchema.index({ receiverId: 1, notificationStatus: 1, createdAt: -1, _id: -1 });
+NotificationSchema.index(
+	{ receiverId: 1, notificationType: 1, inquiryId: 1 },
+	{ unique: true, partialFilterExpression: { inquiryId: { $type: 'objectId' } } },
 );
 
 export default NotificationSchema;
